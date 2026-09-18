@@ -116,7 +116,8 @@ export function WriteOffRequestsView() {
     setIsSubmitting(true);
     setMessage("");
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
 
     try {
       const response = await apiFetch(`/write-off-requests/${id}/reject`, {
@@ -132,7 +133,7 @@ export function WriteOffRequestsView() {
 
       await refresh();
       setMessage("تم رفض طلب الشطب.");
-      event.currentTarget.reset();
+      form.reset();
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "تعذر رفض طلب الشطب.",

@@ -117,7 +117,8 @@ export function TransferRequestsView() {
     setIsSubmitting(true);
     setMessage("");
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
 
     try {
       const response = await apiFetch(`/transfer-requests/${id}/reject`, {
@@ -133,7 +134,7 @@ export function TransferRequestsView() {
 
       await refresh();
       setMessage("تم رفض طلب النقل.");
-      event.currentTarget.reset();
+      form.reset();
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "تعذر رفض طلب النقل.",
