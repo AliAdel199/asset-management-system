@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  api:
+    name: API (build, lint, test, migrations)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: asset_management_system
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/asset_management_system?schema=public
+      JWT_SECRET: ci-only-secret-not-for-production-use
+      WEB_APP_ORIGINS: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: apps/api
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint:api
+
+      - name: Build
+        run: npm run build:api
+
+      - name: Unit tests
+        working-directory: apps/api
+        run: npm test
+
+      - name: Apply migrations to a fresh database
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Run seed script against the fresh database
+        working-directory: apps/api
+        run: node prisma/seed.cjs
+
+  web:
+    name: Web (build, lint)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint:web
+
+      - name: Build
+        run: npm run build:web

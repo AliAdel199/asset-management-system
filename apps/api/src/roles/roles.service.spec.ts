@@ -3,7 +3,11 @@ import { RolesService } from './roles.service';
 
 function createService() {
   const txPrisma = {
-    role: { create: jest.fn(), update: jest.fn(), findUniqueOrThrow: jest.fn() },
+    role: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+    },
     rolePermission: { createMany: jest.fn(), deleteMany: jest.fn() },
   };
 

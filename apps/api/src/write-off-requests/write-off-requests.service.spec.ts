@@ -61,7 +61,7 @@ describe('WriteOffRequestsService.findMany', () => {
 });
 
 describe('WriteOffRequestsService.approve', () => {
-  it('masks a request outside the caller\'s allowed scope as not-found', async () => {
+  it("masks a request outside the caller's allowed scope as not-found", async () => {
     const { service, prisma } = createService();
     prisma.assetWriteOffRequest.findUnique.mockResolvedValue({
       id: 'req-1',
@@ -70,9 +70,9 @@ describe('WriteOffRequestsService.approve', () => {
       asset: { isDeleted: false },
     });
 
-    await expect(
-      service.approve('req-1', actor, ['unit-a']),
-    ).rejects.toThrow(BadRequestException);
+    await expect(service.approve('req-1', actor, ['unit-a'])).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('rejects a request that already has a decision', async () => {
@@ -143,7 +143,7 @@ describe('WriteOffRequestsService.approve', () => {
 });
 
 describe('WriteOffRequestsService.reject', () => {
-  it('masks a request outside the caller\'s allowed scope as not-found', async () => {
+  it("masks a request outside the caller's allowed scope as not-found", async () => {
     const { service, prisma } = createService();
     prisma.assetWriteOffRequest.findUnique.mockResolvedValue({
       id: 'req-1',
@@ -185,12 +185,7 @@ describe('WriteOffRequestsService.reject', () => {
       status: 'REJECTED',
     });
 
-    const result = await service.reject(
-      'req-1',
-      '  سبب الرفض  ',
-      actor,
-      null,
-    );
+    const result = await service.reject('req-1', '  سبب الرفض  ', actor, null);
 
     expect(result.status).toBe('REJECTED');
     expect(prisma.assetWriteOffRequest.update).toHaveBeenCalledWith(

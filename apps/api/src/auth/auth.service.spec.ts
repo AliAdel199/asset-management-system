@@ -197,12 +197,14 @@ describe('AuthService.loadAuthenticatedUser', () => {
     expect(result?.allowedOrganizationUnitIds).toEqual(['fallback-unit']);
   });
 
-  it('falls back to the user\'s own organization unit when there are no active roles at all', async () => {
+  it("falls back to the user's own organization unit when there are no active roles at all", async () => {
     const findManyOrgUnits = jest.fn();
     const { service } = createService({
-      findUnique: jest.fn().mockResolvedValue(
-        buildUser({ organizationUnitId: 'fallback-unit', roles: [] }),
-      ),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(
+          buildUser({ organizationUnitId: 'fallback-unit', roles: [] }),
+        ),
       findManyOrgUnits,
     });
 
@@ -212,7 +214,7 @@ describe('AuthService.loadAuthenticatedUser', () => {
     expect(findManyOrgUnits).not.toHaveBeenCalled();
   });
 
-  it('uses the role assignment\'s own organizationUnitId override instead of the user\'s home unit', async () => {
+  it("uses the role assignment's own organizationUnitId override instead of the user's home unit", async () => {
     const { service } = createService({
       findUnique: jest.fn().mockResolvedValue(
         buildUser({

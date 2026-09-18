@@ -32,4 +32,15 @@ export default tseslint.config(
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },
+  {
+    // اختبارات الوحدة تبني كائنات mock بسيطة عبر `as any` عمداً بدل تكرار الأنواع الضخمة
+    // المولّدة من Prisma - هذا نمط شائع ومقبول لملفات الاختبار تحديداً.
+    files: ['**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+    },
+  },
 );

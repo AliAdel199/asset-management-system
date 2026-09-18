@@ -40,7 +40,10 @@ describe('AssetsService.move (transfer request creation)', () => {
 
   it('rejects moving an already-deactivated asset', async () => {
     const { service, prisma } = createService();
-    prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', isDeleted: true });
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'asset-1',
+      isDeleted: true,
+    });
     prisma.organizationUnit.findUnique.mockResolvedValue({ id: 'unit-b' });
     prisma.assetTransferRequest.findFirst.mockResolvedValue(null);
 
@@ -51,9 +54,14 @@ describe('AssetsService.move (transfer request creation)', () => {
 
   it('rejects when a transfer request is already pending for this asset', async () => {
     const { service, prisma } = createService();
-    prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', isDeleted: false });
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'asset-1',
+      isDeleted: false,
+    });
     prisma.organizationUnit.findUnique.mockResolvedValue({ id: 'unit-b' });
-    prisma.assetTransferRequest.findFirst.mockResolvedValue({ id: 'existing-req' });
+    prisma.assetTransferRequest.findFirst.mockResolvedValue({
+      id: 'existing-req',
+    });
 
     await expect(
       service.move('asset-1', { toOrganizationUnitId: 'unit-b' }, actor),
@@ -114,17 +122,16 @@ describe('AssetsService.requestWriteOff', () => {
     const { service } = createService();
 
     await expect(
-      service.requestWriteOff(
-        'asset-1',
-        { documentNumber: 'WO-1' },
-        actor,
-      ),
+      service.requestWriteOff('asset-1', { documentNumber: 'WO-1' }, actor),
     ).rejects.toThrow(BadRequestException);
   });
 
   it('rejects when the asset does not exist or is already inactive', async () => {
     const { service, prisma } = createService();
-    prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', isDeleted: true });
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'asset-1',
+      isDeleted: true,
+    });
     prisma.assetWriteOffRequest.findFirst.mockResolvedValue(null);
 
     await expect(
@@ -138,8 +145,13 @@ describe('AssetsService.requestWriteOff', () => {
 
   it('rejects when a write-off request is already pending for this asset', async () => {
     const { service, prisma } = createService();
-    prisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', isDeleted: false });
-    prisma.assetWriteOffRequest.findFirst.mockResolvedValue({ id: 'existing-req' });
+    prisma.asset.findUnique.mockResolvedValue({
+      id: 'asset-1',
+      isDeleted: false,
+    });
+    prisma.assetWriteOffRequest.findFirst.mockResolvedValue({
+      id: 'existing-req',
+    });
 
     await expect(
       service.requestWriteOff(

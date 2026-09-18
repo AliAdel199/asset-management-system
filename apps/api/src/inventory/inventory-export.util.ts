@@ -124,9 +124,7 @@ function drawRtlTable(
     doc.font('arabic-bold');
     for (let i = 0; i < headers.length; i += 1) {
       const width = columnWidths[i];
-      doc
-        .rect(x, y, width, ROW_HEIGHT)
-        .fillAndStroke('#eef3f1', '#c7d2ce');
+      doc.rect(x, y, width, ROW_HEIGHT).fillAndStroke('#eef3f1', '#c7d2ce');
       doc
         .fillColor('#0f2f28')
         .text(shapeArabicForPdf(headers[i]), x + 6, y + 6, {
@@ -153,12 +151,10 @@ function drawRtlTable(
     for (let i = 0; i < row.length; i += 1) {
       const width = columnWidths[i];
       doc.rect(x, y, width, ROW_HEIGHT).stroke('#e2e8e6');
-      doc
-        .fillColor('#1c2b27')
-        .text(shapeArabicForPdf(row[i]), x + 6, y + 6, {
-          width: width - 12,
-          align: 'right',
-        });
+      doc.fillColor('#1c2b27').text(shapeArabicForPdf(row[i]), x + 6, y + 6, {
+        width: width - 12,
+        align: 'right',
+      });
       x += width;
     }
 
@@ -206,7 +202,9 @@ export async function buildInventoryPdfBuffer(
     doc.moveDown();
     doc.fontSize(10);
     doc.text(
-      shapeArabicForPdf(`تاريخ إصدار الكشف: ${formatDateArabic(summary.generatedAt)}`),
+      shapeArabicForPdf(
+        `تاريخ إصدار الكشف: ${formatDateArabic(summary.generatedAt)}`,
+      ),
       PAGE_LEFT,
       doc.y,
       { width: PAGE_WIDTH, align: 'right' },

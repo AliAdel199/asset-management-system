@@ -64,7 +64,7 @@ describe('UsersService.findAll', () => {
 });
 
 describe('UsersService.findOne', () => {
-  it('masks a user outside the caller\'s allowed scope as not-found', async () => {
+  it("masks a user outside the caller's allowed scope as not-found", async () => {
     const { service, prisma } = createService();
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
@@ -86,7 +86,7 @@ describe('UsersService.findOne', () => {
 });
 
 describe('UsersService.create', () => {
-  it('rejects an organization unit outside the caller\'s allowed scope', async () => {
+  it("rejects an organization unit outside the caller's allowed scope", async () => {
     const { service, prisma } = createService();
     prisma.organizationUnit.findUnique.mockResolvedValue({
       id: 'unit-outside',
@@ -226,7 +226,7 @@ describe('UsersService.update', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('rejects moving a user to an organization unit outside the caller\'s scope', async () => {
+  it("rejects moving a user to an organization unit outside the caller's scope", async () => {
     const { service, prisma } = createService();
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
@@ -234,12 +234,9 @@ describe('UsersService.update', () => {
     });
 
     await expect(
-      service.update(
-        'user-1',
-        { organizationUnitId: 'unit-outside' },
-        actor,
-        ['unit-a'],
-      ),
+      service.update('user-1', { organizationUnitId: 'unit-outside' }, actor, [
+        'unit-a',
+      ]),
     ).rejects.toThrow(BadRequestException);
   });
 

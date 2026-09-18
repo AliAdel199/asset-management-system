@@ -79,7 +79,12 @@ describe('OrganizationUnitsService.create', () => {
     });
 
     const result = await service.create(
-      { name: 'قسم', code: 'NEW', unitType: 'department', parentId: 'parent-1' },
+      {
+        name: 'قسم',
+        code: 'NEW',
+        unitType: 'department',
+        parentId: 'parent-1',
+      },
       actor,
     );
 
