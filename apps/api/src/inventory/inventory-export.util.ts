@@ -27,11 +27,17 @@ export type InventorySummaryResult = {
   categories: CategorySummary[];
 };
 
-const ARABIC_FONT_PATH = join(
+const ARABIC_FONT_REGULAR_PATH = join(
   process.cwd(),
   'assets',
   'fonts',
-  'NotoNaskhArabic-Regular.ttf',
+  'Tajawal-Regular.ttf',
+);
+const ARABIC_FONT_BOLD_PATH = join(
+  process.cwd(),
+  'assets',
+  'fonts',
+  'Tajawal-Bold.ttf',
 );
 
 export async function buildInventoryExcelBuffer(
@@ -170,6 +176,8 @@ function formatDateArabic(iso: string): string {
   return new Intl.DateTimeFormat('ar-IQ', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    // نفرض الأرقام اللاتينية لأن خط Tajawal المضمّن بالـPDF لا يضمّن أشكال الأرقام الهندية العربية.
+    numberingSystem: 'latn',
   }).format(new Date(iso));
 }
 
@@ -184,8 +192,8 @@ export async function buildInventoryPdfBuffer(
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.registerFont('arabic', ARABIC_FONT_PATH);
-    doc.registerFont('arabic-bold', ARABIC_FONT_PATH);
+    doc.registerFont('arabic', ARABIC_FONT_REGULAR_PATH);
+    doc.registerFont('arabic-bold', ARABIC_FONT_BOLD_PATH);
     doc.font('arabic');
 
     doc
