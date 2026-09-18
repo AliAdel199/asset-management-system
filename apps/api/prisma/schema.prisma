@@ -43,15 +43,17 @@ model User {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  organizationUnit   OrganizationUnit       @relation(fields: [organizationUnitId], references: [id])
-  roles              UserRole[]
-  createdAssets      Asset[]
-  assetMovements     AssetMovement[]
-  auditLogs          AuditLog[]
-  requestedTransfers AssetTransferRequest[] @relation("TransferRequestedBy")
-  decidedTransfers   AssetTransferRequest[] @relation("TransferDecidedBy")
-  requestedWriteOffs AssetWriteOffRequest[] @relation("WriteOffRequestedBy")
-  decidedWriteOffs   AssetWriteOffRequest[] @relation("WriteOffDecidedBy")
+  organizationUnit     OrganizationUnit       @relation(fields: [organizationUnitId], references: [id])
+  roles                UserRole[]
+  createdAssets        Asset[]
+  assetMovements       AssetMovement[]
+  auditLogs            AuditLog[]
+  requestedTransfers   AssetTransferRequest[] @relation("TransferRequestedBy")
+  decidedTransfers     AssetTransferRequest[] @relation("TransferDecidedBy")
+  requestedWriteOffs   AssetWriteOffRequest[] @relation("WriteOffRequestedBy")
+  decidedWriteOffs     AssetWriteOffRequest[] @relation("WriteOffDecidedBy")
+  requestedMaintenance MaintenanceRequest[]   @relation("MaintenanceRequestedBy")
+  decidedMaintenance   MaintenanceRequest[]   @relation("MaintenanceDecidedBy")
 
   @@map("users")
 }
@@ -345,16 +347,22 @@ model MaintenanceRequest {
   maintenanceTypeId String    @map("maintenance_type_id")
   requestNumber     String    @unique @map("request_number")
   description       String
-  status            String    @default("OPEN")
+  status            String    @default("PENDING")
   cost              Decimal?  @map("cost")
   resultNotes       String?   @map("result_notes")
+  requestedByUserId String?   @map("requested_by_user_id")
   requestedAt       DateTime  @default(now()) @map("requested_at")
+  decidedByUserId   String?   @map("decided_by_user_id")
+  decidedAt         DateTime? @map("decided_at")
+  decisionNotes     String?   @map("decision_notes")
   performedAt       DateTime? @map("performed_at")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   asset           Asset                 @relation(fields: [assetId], references: [id])
   maintenanceType MaintenanceType       @relation(fields: [maintenanceTypeId], references: [id])
+  requestedByUser User?                 @relation("MaintenanceRequestedBy", fields: [requestedByUserId], references: [id])
+  decidedByUser   User?                 @relation("MaintenanceDecidedBy", fields: [decidedByUserId], references: [id])
   materials       MaintenanceMaterial[]
   attachments     AssetAttachment[]
 

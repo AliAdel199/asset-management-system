@@ -188,6 +188,11 @@ const permissions = [
     name: 'تعديل/إكمال طلب صيانة',
     module: 'maintenance',
   },
+  {
+    code: 'MAINTENANCE_APPROVE',
+    name: 'اعتماد أو رفض طلب صيانة',
+    module: 'maintenance',
+  },
   { code: 'REPORTS_VIEW', name: 'عرض التقارير', module: 'reports' },
   {
     code: 'AUDIT_LOG_VIEW',
@@ -226,6 +231,7 @@ const rolePermissionsByRoleName = {
     'MAINTENANCE_VIEW',
     'MAINTENANCE_CREATE',
     'MAINTENANCE_UPDATE_STATUS',
+    'MAINTENANCE_APPROVE',
     'REPORTS_VIEW',
     'AUDIT_LOG_VIEW',
   ],
@@ -249,6 +255,7 @@ const rolePermissionsByRoleName = {
     'MAINTENANCE_VIEW',
     'MAINTENANCE_CREATE',
     'MAINTENANCE_UPDATE_STATUS',
+    'MAINTENANCE_APPROVE',
     'REPORTS_VIEW',
   ],
   'مستخدم جهة': ['ASSETS_VIEW', 'REPORTS_VIEW'],

@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseInterceptors,
@@ -17,6 +18,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import type { AuthenticatedUser } from '../auth/types';
 import { CreateMaintenanceRequestDto } from './dto/create-maintenance-request.dto';
+import { RejectMaintenanceRequestDto } from './dto/reject-maintenance-request.dto';
 import { UpdateMaintenanceStatusDto } from './dto/update-maintenance-status.dto';
 import { MaintenanceService } from './maintenance.service';
 
@@ -26,9 +28,15 @@ export class MaintenanceController {
 
   @RequirePermissions('MAINTENANCE_VIEW')
   @Get()
-  findAll(@CurrentUser() user: AuthenticatedUser) {
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status') status?: string,
+  ) {
     // يعرض كل طلبات الصيانة مع بيانات الموجود ونوع الصيانة.
-    return this.maintenanceService.findAll(user.allowedOrganizationUnitIds);
+    return this.maintenanceService.findAll(
+      user.allowedOrganizationUnitIds,
+      status,
+    );
   }
 
   @RequirePermissions('MAINTENANCE_VIEW')
@@ -53,6 +61,35 @@ export class MaintenanceController {
   ) {
     // يستقبل طلب الصيانة من الواجهة ويترك التحقق والحفظ للخدمة.
     return this.maintenanceService.create(body, {
+      userId: user.id,
+      username: user.username,
+      ipAddress: request.ip,
+    });
+  }
+
+  @RequirePermissions('MAINTENANCE_APPROVE')
+  @Post(':id/approve')
+  approve(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.maintenanceService.approve(id, {
+      userId: user.id,
+      username: user.username,
+      ipAddress: request.ip,
+    });
+  }
+
+  @RequirePermissions('MAINTENANCE_APPROVE')
+  @Post(':id/reject')
+  reject(
+    @Param('id') id: string,
+    @Body() body: RejectMaintenanceRequestDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.maintenanceService.reject(id, body?.notes, {
       userId: user.id,
       username: user.username,
       ipAddress: request.ip,

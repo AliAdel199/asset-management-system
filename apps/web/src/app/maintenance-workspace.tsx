@@ -33,6 +33,7 @@ type MaintenanceRequest = {
   performedAt: string | null;
   asset: AssetOption;
   maintenanceType: MaintenanceType;
+  requestedByUser: { id: string; fullName: string } | null;
 };
 
 type MaintenanceWorkspaceProps = {
@@ -46,12 +47,18 @@ type MaintenanceWorkspaceProps = {
 
 const statusOptions = [
   { code: "ALL", label: "كل الطلبات" },
+  { code: "PENDING", label: "بانتظار الموافقة" },
   { code: "OPEN", label: "المفتوحة" },
   { code: "COMPLETED", label: "المكتملة" },
   { code: "CANCELLED", label: "الملغاة" },
+  { code: "REJECTED", label: "المرفوضة" },
 ];
 
 function getMaintenanceStatusLabel(status: string) {
+  if (status === "PENDING") {
+    return "بانتظار الموافقة";
+  }
+
   if (status === "OPEN") {
     return "مفتوح";
   }
@@ -62,6 +69,10 @@ function getMaintenanceStatusLabel(status: string) {
 
   if (status === "CANCELLED") {
     return "ملغى";
+  }
+
+  if (status === "REJECTED") {
+    return "مرفوض";
   }
 
   return status;
@@ -76,7 +87,7 @@ function getStatusClass(status: string) {
     return styles.statusCompleted;
   }
 
-  if (status === "CANCELLED") {
+  if (status === "CANCELLED" || status === "REJECTED") {
     return styles.statusCancelled;
   }
 
@@ -159,6 +170,9 @@ export function MaintenanceWorkspace({
     return visibleRequests.reduce(
       (counts, request) => {
         counts.total += 1;
+        if (request.status === "PENDING") {
+          counts.pending += 1;
+        }
         if (request.status === "OPEN") {
           counts.open += 1;
         }
@@ -170,7 +184,7 @@ export function MaintenanceWorkspace({
         }
         return counts;
       },
-      { cancelled: 0, completed: 0, open: 0, total: 0 },
+      { cancelled: 0, completed: 0, open: 0, pending: 0, total: 0 },
     );
   }, [visibleRequests]);
 
@@ -226,7 +240,10 @@ export function MaintenanceWorkspace({
     setIsSubmitting(true);
     setMessage("");
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const file = formData.get("file");
+    formData.delete("file");
     const payload = Object.fromEntries(formData.entries());
 
     try {
@@ -244,12 +261,35 @@ export function MaintenanceWorkspace({
       }
 
       const savedRequest = (await response.json()) as MaintenanceRequest;
+
+      if (file instanceof File && file.size > 0) {
+        const uploadData = new FormData();
+        uploadData.set("attachmentType", "OTHER");
+        uploadData.set("title", file.name);
+        uploadData.set("file", file);
+
+        const uploadResponse = await apiFetch(
+          `/maintenance-requests/${savedRequest.id}/attachments`,
+          { method: "POST", body: uploadData },
+        );
+
+        if (!uploadResponse.ok) {
+          setRequests((currentRequests) => [savedRequest, ...currentRequests]);
+          setMessage(
+            `تم إنشاء طلب الصيانة ${savedRequest.requestNumber}، لكن تعذر رفع المرفق. افتح تفاصيل الطلب وأعد رفعه من هناك.`,
+          );
+          setMessageTone("error");
+          form.reset();
+          return;
+        }
+      }
+
       setRequests((currentRequests) => [savedRequest, ...currentRequests]);
       setMessage(
-        `تم إنشاء طلب الصيانة ${savedRequest.requestNumber}. يبقى مفتوحاً إلى أن يتم تسجيل نتيجة الصيانة.`,
+        `تم إنشاء طلب الصيانة ${savedRequest.requestNumber} وهو الآن بانتظار موافقة المسؤول.`,
       );
       setMessageTone("success");
-      event.currentTarget.reset();
+      form.reset();
 
       if (redirectAfterCreate) {
         router.push(redirectAfterCreate);
@@ -257,6 +297,75 @@ export function MaintenanceWorkspace({
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "تعذر حفظ طلب الصيانة.",
+      );
+      setMessageTone("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function refreshRequests() {
+    try {
+      const response = await apiFetch("/maintenance-requests");
+
+      if (!response.ok) {
+        throw new Error("تعذر تحديث قائمة الطلبات.");
+      }
+
+      setRequests((await response.json()) as MaintenanceRequest[]);
+    } catch {
+      setMessage("تعذر تحديث قائمة الطلبات.");
+      setMessageTone("error");
+    }
+  }
+
+  async function handleApprove(id: string) {
+    setIsSubmitting(true);
+    setMessage("");
+
+    try {
+      const response = await apiFetch(`/maintenance-requests/${id}/approve`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const error = (await response.json()) as { message?: string };
+        throw new Error(error.message ?? "تعذر اعتماد طلب الصيانة.");
+      }
+
+      await refreshRequests();
+      setMessage("تم اعتماد طلب الصيانة ونقل الموجود إلى قيد الصيانة.");
+      setMessageTone("success");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "تعذر اعتماد طلب الصيانة.",
+      );
+      setMessageTone("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleReject(id: string) {
+    setIsSubmitting(true);
+    setMessage("");
+
+    try {
+      const response = await apiFetch(`/maintenance-requests/${id}/reject`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const error = (await response.json()) as { message?: string };
+        throw new Error(error.message ?? "تعذر رفض طلب الصيانة.");
+      }
+
+      await refreshRequests();
+      setMessage("تم رفض طلب الصيانة.");
+      setMessageTone("success");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "تعذر رفض طلب الصيانة.",
       );
       setMessageTone("error");
     } finally {
@@ -342,6 +451,11 @@ export function MaintenanceWorkspace({
               />
             </label>
 
+            <label>
+              مرفق (اختياري)
+              <input name="file" type="file" />
+            </label>
+
             {visibleAssets.length === 0 && (
               <p className={styles.formHint}>
                 لا توجد موجودات ضمن هذا القسم. أضف موجوداً أولاً حتى يمكن إنشاء
@@ -367,6 +481,10 @@ export function MaintenanceWorkspace({
             <button type="button" onClick={() => setStatusFilter("ALL")}>
               <strong>{statusCounts.total}</strong>
               <span>كل الطلبات</span>
+            </button>
+            <button type="button" onClick={() => setStatusFilter("PENDING")}>
+              <strong>{statusCounts.pending}</strong>
+              <span>بانتظار الموافقة</span>
             </button>
             <button type="button" onClick={() => setStatusFilter("OPEN")}>
               <strong>{statusCounts.open}</strong>
@@ -419,8 +537,9 @@ export function MaintenanceWorkspace({
           <div className={styles.helperPanel}>
             <strong>توضيح الحالة</strong>
             <span>
-              الطلب المفتوح ينتظر تنفيذ الصيانة. عند الإكمال يجب كتابة نتيجة
-              الصيانة، أما الإلغاء فيستخدم للطلبات غير المنفذة أو المكررة.
+              الطلب الجديد يبقى بانتظار الموافقة، وبعد اعتماده من المسؤول ينتقل
+              الموجود إلى قيد الصيانة. عند الإكمال يجب كتابة نتيجة الصيانة، أما
+              الإلغاء فيستخدم للطلبات غير المنفذة أو المكررة.
             </span>
           </div>
 
@@ -459,15 +578,38 @@ export function MaintenanceWorkspace({
                     <td>{displayValue(request.cost)}</td>
                     <td>{request.description}</td>
                     <td>
-                      <button
-                        className={styles.tableActionButton}
-                        onClick={() =>
-                          router.push(`/maintenance/requests/${request.id}`)
-                        }
-                        type="button"
-                      >
-                        فتح الطلب
-                      </button>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          className={styles.tableActionButton}
+                          onClick={() =>
+                            router.push(`/maintenance/requests/${request.id}`)
+                          }
+                          type="button"
+                        >
+                          فتح الطلب
+                        </button>
+                        {request.status === "PENDING" &&
+                          hasPermission("MAINTENANCE_APPROVE") && (
+                            <>
+                              <button
+                                className={styles.tableActionButton}
+                                disabled={isSubmitting}
+                                onClick={() => handleApprove(request.id)}
+                                type="button"
+                              >
+                                اعتماد
+                              </button>
+                              <button
+                                className={styles.tableActionButton}
+                                disabled={isSubmitting}
+                                onClick={() => handleReject(request.id)}
+                                type="button"
+                              >
+                                رفض
+                              </button>
+                            </>
+                          )}
+                      </div>
                     </td>
                   </tr>
                 ))}

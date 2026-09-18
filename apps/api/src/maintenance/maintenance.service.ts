@@ -1,4 +1,6 @@
+import { randomBytes } from 'node:crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import type { AuditActor } from '../audit-log/types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -72,17 +74,18 @@ export class MaintenanceService {
     attachments: {
       orderBy: { createdAt: 'desc' as const },
     },
+    requestedByUser: { select: { id: true, fullName: true } },
+    decidedByUser: { select: { id: true, fullName: true } },
   };
 
-  findAll(allowedOrganizationUnitIds: string[] | null) {
+  findAll(allowedOrganizationUnitIds: string[] | null, status?: string) {
     return this.prisma.maintenanceRequest.findMany({
-      where: allowedOrganizationUnitIds
-        ? {
-            asset: {
-              owningOrganizationUnitId: { in: allowedOrganizationUnitIds },
-            },
-          }
-        : undefined,
+      where: {
+        status: status || undefined,
+        asset: allowedOrganizationUnitIds
+          ? { owningOrganizationUnitId: { in: allowedOrganizationUnitIds } }
+          : undefined,
+      },
       orderBy: { createdAt: 'desc' },
       include: this.requestInclude,
     });
@@ -196,13 +199,10 @@ export class MaintenanceService {
   async create(input: CreateMaintenanceRequestInput, actor: AuditActor) {
     this.assertRequired(input);
 
-    const [asset, maintenanceType, maintenanceStatus] = await Promise.all([
+    const [asset, maintenanceType] = await Promise.all([
       this.prisma.asset.findUnique({ where: { id: input.assetId } }),
       this.prisma.maintenanceType.findUnique({
         where: { id: input.maintenanceTypeId },
-      }),
-      this.prisma.assetStatus.findUnique({
-        where: { code: 'IN_MAINTENANCE' },
       }),
     ]);
 
@@ -220,46 +220,16 @@ export class MaintenanceService {
       throw new BadRequestException('نوع الصيانة المحدد غير موجود.');
     }
 
-    if (!maintenanceStatus) {
-      throw new BadRequestException('حالة قيد الصيانة غير معرفة في النظام.');
-    }
-
-    const requestNumber = await this.generateRequestNumber();
-
-    const createdRequest = await this.prisma.$transaction(async (tx) => {
-      const request = await tx.maintenanceRequest.create({
-        data: {
-          requestNumber,
-          assetId: asset.id,
-          maintenanceTypeId: maintenanceType.id,
-          description: input.description!.trim(),
-          cost: this.normalizeOptionalNumber(input.cost),
-          resultNotes: null,
-        },
-      });
-
-      if (asset.statusId !== maintenanceStatus.id) {
-        await tx.asset.update({
-          where: { id: asset.id },
-          data: { statusId: maintenanceStatus.id },
-        });
-
-        await tx.assetMovement.create({
-          data: {
-            assetId: asset.id,
-            movementType: 'STATUS_CHANGE',
-            fromStatusId: asset.statusId,
-            toStatusId: maintenanceStatus.id,
-            documentNumber: request.requestNumber,
-            notes: 'تم تحويل الموجود إلى قيد الصيانة عند فتح طلب صيانة.',
-          },
-        });
-      }
-
-      return tx.maintenanceRequest.findUniqueOrThrow({
-        where: { id: request.id },
-        include: this.requestInclude,
-      });
+    // الطلب يبقى بانتظار الموافقة ولا يغيّر حالة الموجود؛ التحويل الفعلي لقيد الصيانة
+    // يحدث فقط عند اعتماد الطلب (approve) حتى يمر النظام بنفس منطق النقل والشطب.
+    const createdRequest = await this.createRequestWithUniqueNumber({
+      assetId: asset.id,
+      maintenanceTypeId: maintenanceType.id,
+      description: input.description!.trim(),
+      cost: this.normalizeOptionalNumber(input.cost),
+      resultNotes: null,
+      status: 'PENDING',
+      requestedByUserId: actor.userId ?? null,
     });
 
     await this.auditLogService.record({
@@ -268,10 +238,117 @@ export class MaintenanceService {
       module: 'maintenance',
       entityType: 'MaintenanceRequest',
       entityId: createdRequest.id,
-      description: `فتح طلب صيانة ${createdRequest.requestNumber} للموجود ${asset.internalNumber}.`,
+      description: `طلب صيانة جديد ${createdRequest.requestNumber} للموجود ${asset.internalNumber} (بانتظار الموافقة).`,
     });
 
     return createdRequest;
+  }
+
+  async approve(id: string, actor: AuditActor) {
+    const [request, maintenanceStatus] = await Promise.all([
+      this.prisma.maintenanceRequest.findUnique({
+        where: { id },
+        include: { asset: true },
+      }),
+      this.prisma.assetStatus.findUnique({
+        where: { code: 'IN_MAINTENANCE' },
+      }),
+    ]);
+
+    if (!request) {
+      throw new BadRequestException('طلب الصيانة المحدد غير موجود.');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException('تم اتخاذ قرار بهذا الطلب مسبقاً.');
+    }
+
+    if (request.asset.isDeleted) {
+      throw new BadRequestException('لا يمكن اعتماد صيانة لموجود معطل.');
+    }
+
+    if (!maintenanceStatus) {
+      throw new BadRequestException('حالة قيد الصيانة غير معرفة في النظام.');
+    }
+
+    const approvedRequest = await this.prisma.$transaction(async (tx) => {
+      if (request.asset.statusId !== maintenanceStatus.id) {
+        await tx.asset.update({
+          where: { id: request.assetId },
+          data: { statusId: maintenanceStatus.id },
+        });
+
+        await tx.assetMovement.create({
+          data: {
+            assetId: request.assetId,
+            movementType: 'STATUS_CHANGE',
+            fromStatusId: request.asset.statusId,
+            toStatusId: maintenanceStatus.id,
+            documentNumber: request.requestNumber,
+            notes: 'تم تحويل الموجود إلى قيد الصيانة عند اعتماد طلب الصيانة.',
+            createdByUserId: actor.userId ?? null,
+          },
+        });
+      }
+
+      return tx.maintenanceRequest.update({
+        where: { id },
+        data: {
+          status: 'OPEN',
+          decidedByUserId: actor.userId ?? null,
+          decidedAt: new Date(),
+        },
+        include: this.requestInclude,
+      });
+    });
+
+    await this.auditLogService.record({
+      ...actor,
+      action: 'MAINTENANCE_APPROVE',
+      module: 'maintenance',
+      entityType: 'MaintenanceRequest',
+      entityId: approvedRequest.id,
+      description: `اعتماد طلب الصيانة ${approvedRequest.requestNumber} للموجود ${request.asset.internalNumber}.`,
+    });
+
+    return approvedRequest;
+  }
+
+  async reject(id: string, notes: string | undefined, actor: AuditActor) {
+    const request = await this.prisma.maintenanceRequest.findUnique({
+      where: { id },
+      include: { asset: { select: { internalNumber: true } } },
+    });
+
+    if (!request) {
+      throw new BadRequestException('طلب الصيانة المحدد غير موجود.');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException('تم اتخاذ قرار بهذا الطلب مسبقاً.');
+    }
+
+    const rejectedRequest = await this.prisma.maintenanceRequest.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        decidedByUserId: actor.userId ?? null,
+        decidedAt: new Date(),
+        decisionNotes: this.normalizeOptionalString(notes),
+      },
+      include: this.requestInclude,
+    });
+
+    await this.auditLogService.record({
+      ...actor,
+      action: 'MAINTENANCE_REJECT',
+      module: 'maintenance',
+      entityType: 'MaintenanceRequest',
+      entityId: rejectedRequest.id,
+      description: `رفض طلب الصيانة ${rejectedRequest.requestNumber} للموجود ${request.asset.internalNumber}.`,
+    });
+
+    return rejectedRequest;
   }
 
   async updateStatus(
@@ -488,23 +565,41 @@ export class MaintenanceService {
     return workingStatus;
   }
 
-  private async generateRequestNumber() {
+  private generateRequestNumber() {
+    // لاحقة عشوائية بدل عدّاد تسلسلي (قراءة-ثم-كتابة غير ذرية) حتى لا يتصادم رقمان
+    // عند إنشاء طلبين بنفس اللحظة تقريباً - بنفس أسلوب AssetsService.generateInternalNumber.
     const year = new Date().getFullYear();
-    const startOfYear = new Date(year, 0, 1);
-    const startOfNextYear = new Date(year + 1, 0, 1);
+    const suffix = randomBytes(4).toString('hex').toUpperCase();
 
-    const count = await this.prisma.maintenanceRequest.count({
-      where: {
-        createdAt: {
-          gte: startOfYear,
-          lt: startOfNextYear,
-        },
-      },
-    });
+    return `MTN-${year}-${suffix}`;
+  }
 
-    const sequence = String(count + 1).padStart(5, '0');
+  private async createRequestWithUniqueNumber(
+    data: Omit<Prisma.MaintenanceRequestUncheckedCreateInput, 'requestNumber'>,
+  ) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const requestNumber = this.generateRequestNumber();
 
-    return `MTN-${year}-${sequence}`;
+      try {
+        return await this.prisma.maintenanceRequest.create({
+          data: { ...data, requestNumber },
+          include: this.requestInclude,
+        });
+      } catch (error) {
+        // نتحقق من كود الخطأ مباشرة بدل instanceof: عميل Prisma المولّد هنا قد لا يشارك
+        // نفس مرجع الصنف مع Prisma.PrismaClientKnownRequestError المستورد، فيفشل instanceof بصمت.
+        const isDuplicateRequestNumber =
+          typeof error === 'object' &&
+          error !== null &&
+          (error as { code?: unknown }).code === 'P2002';
+
+        if (!isDuplicateRequestNumber || attempt === 4) {
+          throw error;
+        }
+      }
+    }
+
+    throw new BadRequestException('تعذر توليد رقم طلب صيانة فريد.');
   }
 
   private normalizeOptionalString(value: string | null | undefined) {

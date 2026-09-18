@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, resolveApiFileUrl } from "./api-client";
+import { useAuth } from "./auth-context";
 import styles from "./page.module.css";
 
 type MaintenanceMaterial = {
@@ -41,6 +42,9 @@ type MaintenanceRequestDetails = {
   maintenanceType: { name: string };
   materials: MaintenanceMaterial[];
   attachments: RequestAttachment[];
+  requestedByUser: { id: string; fullName: string } | null;
+  decidedByUser: { id: string; fullName: string } | null;
+  decisionNotes: string | null;
 };
 
 type AssetStatus = {
@@ -61,6 +65,10 @@ type MaterialRow = {
 };
 
 function statusLabel(status: string) {
+  if (status === "PENDING") {
+    return "بانتظار الموافقة";
+  }
+
   if (status === "OPEN") {
     return "مفتوح";
   }
@@ -71,6 +79,10 @@ function statusLabel(status: string) {
 
   if (status === "CANCELLED") {
     return "ملغى";
+  }
+
+  if (status === "REJECTED") {
+    return "مرفوض";
   }
 
   return status;
@@ -108,6 +120,7 @@ export function MaintenanceRequestDetailsView({
   requestId: string;
 }) {
   const router = useRouter();
+  const { hasPermission } = useAuth();
   const [request, setRequest] = useState<MaintenanceRequestDetails | null>(null);
   const [message, setMessage] = useState("جاري تحميل تفاصيل طلب الصيانة.");
   const [tone, setTone] = useState<"info" | "success" | "error">("info");
@@ -287,6 +300,47 @@ export function MaintenanceRequestDetailsView({
     }
   }
 
+  async function decideRequest(decision: "approve" | "reject") {
+    setIsSubmitting(true);
+    setMessage("");
+
+    try {
+      const response = await apiFetch(
+        `/maintenance-requests/${requestId}/${decision}`,
+        { method: "POST" },
+      );
+
+      if (!response.ok) {
+        const error = (await response.json()) as { message?: string };
+        throw new Error(
+          error.message ??
+            (decision === "approve"
+              ? "تعذر اعتماد طلب الصيانة."
+              : "تعذر رفض طلب الصيانة."),
+        );
+      }
+
+      await loadRequest();
+      setMessage(
+        decision === "approve"
+          ? "تم اعتماد طلب الصيانة ونقل الموجود إلى قيد الصيانة."
+          : "تم رفض طلب الصيانة.",
+      );
+      setTone("success");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : decision === "approve"
+            ? "تعذر اعتماد طلب الصيانة."
+            : "تعذر رفض طلب الصيانة.",
+      );
+      setTone("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function uploadAttachment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -373,6 +427,17 @@ export function MaintenanceRequestDetailsView({
             <dd>{request.asset.status.name}</dd>
             <dt>الكلفة النهائية</dt>
             <dd>{displayValue(request.cost)}</dd>
+            <dt>مقدّم الطلب</dt>
+            <dd>{request.requestedByUser?.fullName ?? "غير معروف"}</dd>
+            {request.decidedByUser && (
+              <>
+                <dt>القرار</dt>
+                <dd>
+                  {request.decidedByUser.fullName}
+                  {request.decisionNotes ? ` - ${request.decisionNotes}` : ""}
+                </dd>
+              </>
+            )}
           </dl>
         </article>
 
@@ -386,6 +451,41 @@ export function MaintenanceRequestDetailsView({
           </dl>
         </article>
       </section>
+
+      {request.status === "PENDING" && (
+        <section className={styles.assetsWorkspace}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.eyebrow}>بانتظار الموافقة</p>
+              <h3>اعتماد أو رفض طلب الصيانة</h3>
+            </div>
+          </div>
+
+          {hasPermission("MAINTENANCE_APPROVE") ? (
+            <div className={styles.formActions}>
+              <button
+                disabled={isSubmitting}
+                onClick={() => decideRequest("approve")}
+                type="button"
+              >
+                {isSubmitting ? "جاري التنفيذ" : "اعتماد الطلب"}
+              </button>
+              <button
+                disabled={isSubmitting}
+                onClick={() => decideRequest("reject")}
+                type="button"
+              >
+                رفض الطلب
+              </button>
+            </div>
+          ) : (
+            <p className={styles.formHint}>
+              هذا الطلب بانتظار موافقة مسؤول مخوّل قبل أن ينتقل الموجود إلى قيد
+              الصيانة.
+            </p>
+          )}
+        </section>
+      )}
 
       {request.status === "OPEN" && (
         <section className={styles.assetsWorkspace}>

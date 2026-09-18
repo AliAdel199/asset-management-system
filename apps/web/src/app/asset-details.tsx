@@ -160,6 +160,10 @@ function displayValue(value: string | number | boolean | null | undefined) {
 }
 
 function statusLabel(status: string) {
+  if (status === "PENDING") {
+    return "بانتظار الموافقة";
+  }
+
   if (status === "OPEN") {
     return "مفتوح";
   }
@@ -170,6 +174,10 @@ function statusLabel(status: string) {
 
   if (status === "CANCELLED") {
     return "ملغى";
+  }
+
+  if (status === "REJECTED") {
+    return "مرفوض";
   }
 
   return status;
@@ -387,21 +395,27 @@ export function AssetDetailsView({
     };
   }, [assetId]);
 
-  async function uploadActionAttachment(
+  async function uploadAttachment(
+    targetPath: string,
     file: File,
     attachmentType: string,
     title: string,
   ) {
-    // نرفق المستند الداعم للإجراء (كتاب النقل، محضر التسليم...) بنفس طلب الإجراء.
+    // نرفق المستند بنفس السجل الذي أنشأه الإجراء (طلب نقل، طلب صيانة، طلب شطب...)
+    // وليس بالموجود دائماً، حتى يظهر المرفق مع الطلب نفسه لا في قائمة مرفقات عامة.
     const uploadData = new FormData();
     uploadData.set("attachmentType", attachmentType);
     uploadData.set("title", title);
     uploadData.set("file", file);
 
-    await apiFetch(`/assets/${assetId}/attachments`, {
+    const response = await apiFetch(`/${targetPath}/attachments`, {
       method: "POST",
       body: uploadData,
     });
+
+    if (!response.ok) {
+      throw new Error("تم تنفيذ الإجراء، لكن تعذر رفع المرفق المرفق به.");
+    }
   }
 
   async function submitAssetAction(
@@ -411,6 +425,7 @@ export function AssetDetailsView({
     attachmentType: string,
     attachmentTitle: string,
     method: "POST" | "PATCH" = "POST",
+    attachmentTarget: "assets" | "transfer-requests" | "write-off-requests" = "assets",
   ) {
     event.preventDefault();
     setIsSubmitting(true);
@@ -435,7 +450,17 @@ export function AssetDetailsView({
       }
 
       if (file instanceof File && file.size > 0) {
-        await uploadActionAttachment(file, attachmentType, attachmentTitle);
+        const targetId =
+          attachmentTarget === "assets"
+            ? assetId
+            : ((await response.json()) as { id: string }).id;
+
+        await uploadAttachment(
+          `${attachmentTarget}/${targetId}`,
+          file,
+          attachmentType,
+          attachmentTitle,
+        );
       }
 
       await refreshAsset();
@@ -476,12 +501,21 @@ export function AssetDetailsView({
         throw new Error(error.message ?? "تعذر إنشاء طلب الصيانة.");
       }
 
+      const savedRequest = (await response.json()) as { id: string };
+
       if (file instanceof File && file.size > 0) {
-        await uploadActionAttachment(file, "OTHER", "مرفق طلب الصيانة");
+        await uploadAttachment(
+          `maintenance-requests/${savedRequest.id}`,
+          file,
+          "OTHER",
+          "مرفق طلب الصيانة",
+        );
       }
 
       await refreshAsset();
-      setActionMessage("تم إنشاء طلب الصيانة وربطه بالموجود.");
+      setActionMessage(
+        "تم إنشاء طلب الصيانة وربطه بالموجود، وهو الآن بانتظار موافقة المسؤول.",
+      );
       form.reset();
     } catch (error) {
       setActionMessage(
@@ -727,6 +761,8 @@ export function AssetDetailsView({
                     "تم إرسال طلب النقل، بانتظار موافقة الجهة المخوّلة.",
                     "TRANSFER_BOOK",
                     "كتاب نقل الموجود",
+                    "POST",
+                    "transfer-requests",
                   )
                 }
               >
@@ -884,6 +920,7 @@ export function AssetDetailsView({
                   "OTHER",
                   "مستند الشطب",
                   "PATCH",
+                  "write-off-requests",
                 )
               }}
             >
