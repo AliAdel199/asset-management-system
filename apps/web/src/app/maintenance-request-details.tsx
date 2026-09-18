@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "./api-client";
+import { apiFetch, resolveApiFileUrl } from "./api-client";
 import styles from "./page.module.css";
 
 type MaintenanceMaterial = {
@@ -11,6 +11,15 @@ type MaintenanceMaterial = {
   quantity: string | null;
   unitCost: string;
   notes: string | null;
+};
+
+type RequestAttachment = {
+  id: string;
+  attachmentType: string;
+  title: string;
+  fileUrl: string;
+  notes: string | null;
+  createdAt: string;
 };
 
 type MaintenanceRequestDetails = {
@@ -31,6 +40,7 @@ type MaintenanceRequestDetails = {
   };
   maintenanceType: { name: string };
   materials: MaintenanceMaterial[];
+  attachments: RequestAttachment[];
 };
 
 type AssetStatus = {
@@ -83,6 +93,13 @@ function materialTotalCost(material: MaintenanceMaterial) {
 
 function emptyMaterial(): MaterialRow {
   return { materialName: "", notes: "", quantity: "1", unitCost: "" };
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("ar-IQ", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 export function MaintenanceRequestDetailsView({
@@ -264,6 +281,45 @@ export function MaintenanceRequestDetailsView({
       setMessage(
         error instanceof Error ? error.message : "تعذر تحديث طلب الصيانة.",
       );
+      setTone("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function uploadAttachment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      setMessage("اختر ملفاً لرفعه.");
+      setTone("error");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("");
+
+    try {
+      const response = await apiFetch(
+        `/maintenance-requests/${requestId}/attachments`,
+        { method: "POST", body: formData },
+      );
+
+      if (!response.ok) {
+        const error = (await response.json()) as { message?: string };
+        throw new Error(error.message ?? "تعذر رفع المرفق.");
+      }
+
+      await loadRequest();
+      setMessage("تم رفع المرفق بنجاح.");
+      setTone("success");
+      form.reset();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "تعذر رفع المرفق.");
       setTone("error");
     } finally {
       setIsSubmitting(false);
@@ -492,6 +548,81 @@ export function MaintenanceRequestDetailsView({
               {request.materials.length === 0 && (
                 <tr>
                   <td colSpan={5}>لا توجد مواد مسجلة لهذا الطلب.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className={styles.assetsWorkspace}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.eyebrow}>مرفقات الطلب</p>
+            <h3>الفواتير والمستندات الداعمة</h3>
+          </div>
+          <span>{request.attachments.length} مرفق</span>
+        </div>
+
+        <form
+          className={styles.assetForm}
+          onSubmit={uploadAttachment}
+        >
+          <label>
+            نوع المرفق
+            <input name="attachmentType" placeholder="مثال: فاتورة" required />
+          </label>
+          <label>
+            العنوان
+            <input name="title" placeholder="عنوان المرفق" required />
+          </label>
+          <label>
+            الملف
+            <input name="file" required type="file" />
+          </label>
+          <label className={styles.fullWidth}>
+            ملاحظات
+            <input name="notes" placeholder="ملاحظة (اختياري)" />
+          </label>
+          <div className={styles.formActions}>
+            <button disabled={isSubmitting} type="submit">
+              {isSubmitting ? "جاري الرفع" : "رفع المرفق"}
+            </button>
+          </div>
+        </form>
+
+        <div className={styles.assetsTableWrap}>
+          <table className={styles.assetsTable}>
+            <thead>
+              <tr>
+                <th>نوع المرفق</th>
+                <th>العنوان</th>
+                <th>الملف</th>
+                <th>التاريخ</th>
+                <th>ملاحظات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {request.attachments.map((attachment) => (
+                <tr key={attachment.id}>
+                  <td>{attachment.attachmentType}</td>
+                  <td>{attachment.title}</td>
+                  <td>
+                    <a
+                      href={resolveApiFileUrl(attachment.fileUrl)}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      فتح
+                    </a>
+                  </td>
+                  <td>{formatDate(attachment.createdAt)}</td>
+                  <td>{displayValue(attachment.notes)}</td>
+                </tr>
+              ))}
+              {request.attachments.length === 0 && (
+                <tr>
+                  <td colSpan={5}>لا توجد مرفقات لهذا الطلب بعد.</td>
                 </tr>
               )}
             </tbody>

@@ -111,6 +111,44 @@ export function WriteOffRequestsView() {
     }
   }
 
+  async function handleAttach(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      setMessage("اختر ملفاً لرفعه.");
+      return;
+    }
+
+    formData.set("attachmentType", "supporting-document");
+    formData.set("title", file.name);
+
+    setIsSubmitting(true);
+    setMessage("");
+
+    try {
+      const response = await apiFetch(
+        `/write-off-requests/${id}/attachments`,
+        { method: "POST", body: formData },
+      );
+
+      if (!response.ok) {
+        const error = (await response.json()) as { message?: string };
+        throw new Error(error.message ?? "تعذر رفع المرفق.");
+      }
+
+      setMessage("تم رفع المرفق بنجاح.");
+      form.reset();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "تعذر رفع المرفق.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function handleReject(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
     setIsSubmitting(true);
@@ -223,6 +261,24 @@ export function WriteOffRequestsView() {
                         type="submit"
                       >
                         رفض
+                      </button>
+                    </form>
+                    <form
+                      onSubmit={(event) => handleAttach(event, request.id)}
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        marginTop: 6,
+                      }}
+                    >
+                      <input name="file" required type="file" />
+                      <button
+                        className={styles.tableActionButton}
+                        disabled={isSubmitting}
+                        type="submit"
+                      >
+                        إرفاق مستند
                       </button>
                     </form>
                   </td>
