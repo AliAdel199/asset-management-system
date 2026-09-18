@@ -69,7 +69,7 @@ jobs:
         run: npm run test:e2e
 
   web:
-    name: Web (build, lint)
+    name: Web (build, lint, unit tests)
     runs-on: ubuntu-latest
 
     steps:
@@ -85,6 +85,9 @@ jobs:
 
       - name: Lint
         run: npm run lint:web
+
+      - name: Unit tests
+        run: npm run test:web
 
       - name: Build
         run: npm run build:web

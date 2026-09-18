@@ -16,7 +16,8 @@
     "build": "npm run build:web && npm run build:api",
     "lint:web": "npm run lint --workspace apps/web",
     "lint:api": "npm run lint --workspace apps/api",
-    "lint": "npm run lint:web && npm run lint:api"
+    "lint": "npm run lint:web && npm run lint:api",
+    "test:web": "npm run test --workspace apps/web"
   },
   "engines": {
     "node": ">=22"
