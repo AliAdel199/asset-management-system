@@ -1,0 +1,70 @@
+:root {
+  --background: #eef2f1;
+  --foreground: #16211e;
+
+  --surface: #ffffff;
+  --surface-alt: #f6f9f8;
+  --surface-sunken: #eef3f1;
+
+  --border: #e2e9e6;
+  --border-strong: #cfdad6;
+
+  --text: #16211e;
+  --text-muted: #5c6d68;
+  --text-faint: #8a9994;
+
+  --accent: #1f6b5d;
+  --accent-strong: #154c41;
+  --accent-soft: #e6f2ee;
+  --accent-contrast: #ffffff;
+
+  --danger: #b3261e;
+  --danger-soft: #fdecec;
+  --warning-soft: #fff4d6;
+  --warning-text: #7a4c00;
+
+  --sidebar-from: #10241f;
+  --sidebar-to: #1c3f37;
+  --sidebar-text: #f4faf8;
+  --sidebar-text-muted: #a9c8c0;
+
+  --radius-lg: 18px;
+  --radius: 14px;
+  --radius-sm: 10px;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 21, 0.05);
+  --shadow-md: 0 8px 24px -12px rgba(15, 23, 21, 0.18);
+  --shadow-lg: 0 20px 45px -20px rgba(15, 23, 21, 0.28);
+}
+
+html {
+  height: 100%;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}

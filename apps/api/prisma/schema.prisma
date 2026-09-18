@@ -1,0 +1,466 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model OrganizationUnit {
+  id        String   @id @default(uuid())
+  parentId  String?  @map("parent_id")
+  name      String
+  code      String   @unique
+  unitType  String   @map("unit_type")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent                   OrganizationUnit?      @relation("OrganizationHierarchy", fields: [parentId], references: [id])
+  children                 OrganizationUnit[]     @relation("OrganizationHierarchy")
+  users                    User[]
+  scopedUserRoles          UserRole[]
+  ownedAssets              Asset[]                @relation("AssetOwningOrganization")
+  currentHeldAssets        Asset[]                @relation("AssetCurrentHolderOrganization")
+  employees                Employee[]
+  outgoingMovements        AssetMovement[]        @relation("AssetMovementFromOrganization")
+  incomingMovements        AssetMovement[]        @relation("AssetMovementToOrganization")
+  outgoingTransferRequests AssetTransferRequest[] @relation("TransferRequestFromOrganization")
+  incomingTransferRequests AssetTransferRequest[] @relation("TransferRequestToOrganization")
+
+  @@map("organization_units")
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  organizationUnitId String    @map("organization_unit_id")
+  fullName           String    @map("full_name")
+  username           String    @unique
+  passwordHash       String    @map("password_hash")
+  isActive           Boolean   @default(true) @map("is_active")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  organizationUnit   OrganizationUnit       @relation(fields: [organizationUnitId], references: [id])
+  roles              UserRole[]
+  createdAssets      Asset[]
+  assetMovements     AssetMovement[]
+  auditLogs          AuditLog[]
+  requestedTransfers AssetTransferRequest[] @relation("TransferRequestedBy")
+  decidedTransfers   AssetTransferRequest[] @relation("TransferDecidedBy")
+
+  @@map("users")
+}
+
+model Role {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  scopeLevel  String  @map("scope_level")
+  isActive    Boolean @default(true) @map("is_active")
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id                 String  @id @default(uuid())
+  userId             String  @map("user_id")
+  roleId             String  @map("role_id")
+  organizationUnitId String? @map("organization_unit_id")
+
+  user             User              @relation(fields: [userId], references: [id])
+  role             Role              @relation(fields: [roleId], references: [id])
+  organizationUnit OrganizationUnit? @relation(fields: [organizationUnitId], references: [id])
+
+  @@unique([userId, roleId, organizationUnitId])
+  @@map("user_roles")
+}
+
+model Permission {
+  id     String @id @default(uuid())
+  code   String @unique
+  name   String
+  module String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model AssetCategory {
+  id          String  @id @default(uuid())
+  name        String
+  code        String  @unique
+  description String?
+  isActive    Boolean @default(true) @map("is_active")
+
+  assetTypes AssetType[]
+  assets     Asset[]
+
+  @@map("asset_categories")
+}
+
+model AssetType {
+  id              String  @id @default(uuid())
+  assetCategoryId String  @map("asset_category_id")
+  name            String
+  description     String?
+  isActive        Boolean @default(true) @map("is_active")
+
+  assetCategory AssetCategory @relation(fields: [assetCategoryId], references: [id])
+  assets        Asset[]
+
+  @@unique([assetCategoryId, name])
+  @@map("asset_types")
+}
+
+model UsageNature {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  isActive    Boolean @default(true) @map("is_active")
+
+  assets Asset[]
+
+  @@map("usage_natures")
+}
+
+model AssetStatus {
+  id         String  @id @default(uuid())
+  code       String  @unique
+  name       String
+  isTerminal Boolean @default(false) @map("is_terminal")
+  isActive   Boolean @default(true) @map("is_active")
+
+  assets            Asset[]
+  outgoingMovements AssetMovement[] @relation("AssetMovementFromStatus")
+  incomingMovements AssetMovement[] @relation("AssetMovementToStatus")
+
+  @@map("asset_statuses")
+}
+
+model MaintenanceType {
+  id       String  @id @default(uuid())
+  code     String  @unique
+  name     String
+  isActive Boolean @default(true) @map("is_active")
+
+  maintenanceRequests MaintenanceRequest[]
+
+  @@map("maintenance_types")
+}
+
+model MaintenanceInterval {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  monthsCount Int     @map("months_count")
+  isActive    Boolean @default(true) @map("is_active")
+
+  assets Asset[]
+
+  @@map("maintenance_intervals")
+}
+
+model Supplier {
+  id           String  @id @default(uuid())
+  name         String
+  supplierType String  @map("supplier_type")
+  contactInfo  String? @map("contact_info")
+  isActive     Boolean @default(true) @map("is_active")
+
+  assets Asset[]
+
+  @@map("suppliers")
+}
+
+model Employee {
+  id                 String  @id @default(uuid())
+  organizationUnitId String  @map("organization_unit_id")
+  fullName           String  @map("full_name")
+  employeeNumber     String? @unique @map("employee_number")
+  isActive           Boolean @default(true) @map("is_active")
+
+  organizationUnit  OrganizationUnit @relation(fields: [organizationUnitId], references: [id])
+  currentAssets     Asset[]
+  outgoingMovements AssetMovement[]  @relation("AssetMovementFromEmployee")
+  incomingMovements AssetMovement[]  @relation("AssetMovementToEmployee")
+
+  @@map("employees")
+}
+
+model Asset {
+  id                              String    @id @default(uuid())
+  internalNumber                  String    @unique @map("internal_number")
+  qrCodeValue                     String?   @unique @map("qr_code_value")
+  assetCategoryId                 String    @map("asset_category_id")
+  assetTypeId                     String    @map("asset_type_id")
+  usageNatureId                   String?   @map("usage_nature_id")
+  maintenanceIntervalId           String?   @map("maintenance_interval_id")
+  statusId                        String    @map("status_id")
+  owningOrganizationUnitId        String    @map("owning_organization_unit_id")
+  currentHolderOrganizationUnitId String?   @map("current_holder_organization_unit_id")
+  currentHolderEmployeeId         String?   @map("current_holder_employee_id")
+  supplierId                      String?   @map("supplier_id")
+  bookValue                       Decimal?  @map("book_value")
+  model                           String?
+  origin                          String?
+  manufactureYear                 Int?      @map("manufacture_year")
+  serialNumber                    String?   @map("serial_number")
+  serialNumberMissing             Boolean   @default(false) @map("serial_number_missing")
+  receiptNumber                   String?   @map("receipt_number")
+  supplyDate                      DateTime? @map("supply_date")
+  receivedDate                    DateTime? @map("received_date")
+  serviceEntryDate                DateTime? @map("service_entry_date")
+  issueDocumentNumber             String?   @map("issue_document_number")
+  dailySequence                   String?   @map("daily_sequence")
+  documentDate                    DateTime? @map("document_date")
+  notes                           String?
+  isDeleted                       Boolean   @default(false) @map("is_deleted")
+  createdByUserId                 String?   @map("created_by_user_id")
+  createdAt                       DateTime  @default(now()) @map("created_at")
+  updatedAt                       DateTime  @updatedAt @map("updated_at")
+
+  assetCategory                 AssetCategory          @relation(fields: [assetCategoryId], references: [id])
+  assetType                     AssetType              @relation(fields: [assetTypeId], references: [id])
+  usageNature                   UsageNature?           @relation(fields: [usageNatureId], references: [id])
+  maintenanceInterval           MaintenanceInterval?   @relation(fields: [maintenanceIntervalId], references: [id])
+  status                        AssetStatus            @relation(fields: [statusId], references: [id])
+  owningOrganizationUnit        OrganizationUnit       @relation("AssetOwningOrganization", fields: [owningOrganizationUnitId], references: [id])
+  currentHolderOrganizationUnit OrganizationUnit?      @relation("AssetCurrentHolderOrganization", fields: [currentHolderOrganizationUnitId], references: [id])
+  currentHolderEmployee         Employee?              @relation(fields: [currentHolderEmployeeId], references: [id])
+  supplier                      Supplier?              @relation(fields: [supplierId], references: [id])
+  createdByUser                 User?                  @relation(fields: [createdByUserId], references: [id])
+  maintenanceRequests           MaintenanceRequest[]
+  movements                     AssetMovement[]
+  attachments                   AssetAttachment[]
+  transferRequests              AssetTransferRequest[]
+  generalDetails                GeneralAssetDetail?
+  vehicleDetails                VehicleAssetDetail?
+  landDetails                   LandAssetDetail?
+  realEstateDetails             RealEstateAssetDetail?
+
+  @@index([serialNumber])
+  @@index([assetCategoryId])
+  @@index([assetTypeId])
+  @@index([statusId])
+  @@index([owningOrganizationUnitId])
+  @@index([currentHolderOrganizationUnitId])
+  @@map("assets")
+}
+
+model GeneralAssetDetail {
+  assetId         String  @id @map("asset_id")
+  assetName       String? @map("asset_name")
+  brand           String?
+  inventoryNumber String? @map("inventory_number")
+  locationName    String? @map("location_name")
+  custodianName   String? @map("custodian_name")
+  conditionNotes  String? @map("condition_notes")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("general_asset_details")
+}
+
+model VehicleAssetDetail {
+  assetId       String  @id @map("asset_id")
+  plateNumber   String? @map("plate_number")
+  chassisNumber String? @map("chassis_number")
+  engineNumber  String? @map("engine_number")
+  vehicleType   String? @map("vehicle_type")
+  color         String?
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("vehicle_asset_details")
+}
+
+model LandAssetDetail {
+  assetId          String   @id @map("asset_id")
+  plotNumber       String?  @map("plot_number")
+  district         String?
+  municipality     String?
+  areaSquareMeters Decimal? @map("area_square_meters")
+  landUse          String?  @map("land_use")
+  titleDeedNumber  String?  @map("title_deed_number")
+  cadastralNumber  String?  @map("cadastral_number")
+  propertyGenre    String?  @map("property_genre")
+  ownershipType    String?  @map("ownership_type")
+  occupancyStatus  String?  @map("occupancy_status")
+  boundaries       String?
+  latitude         Decimal? @map("latitude")
+  longitude        Decimal? @map("longitude")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("land_asset_details")
+}
+
+model RealEstateAssetDetail {
+  assetId                  String   @id @map("asset_id")
+  propertyNumber           String?  @map("property_number")
+  address                  String?
+  floorsCount              Int?     @map("floors_count")
+  buildingAreaSquareMeters Decimal? @map("building_area_square_meters")
+  constructionYear         Int?     @map("construction_year")
+  titleDeedNumber          String?  @map("title_deed_number")
+  cadastralNumber          String?  @map("cadastral_number")
+  propertyGenre            String?  @map("property_genre")
+  ownershipType            String?  @map("ownership_type")
+  occupancyStatus          String?  @map("occupancy_status")
+  boundaries               String?
+  latitude                 Decimal? @map("latitude")
+  longitude                Decimal? @map("longitude")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("real_estate_asset_details")
+}
+
+model MaintenanceRequest {
+  id                String    @id @default(uuid())
+  assetId           String    @map("asset_id")
+  maintenanceTypeId String    @map("maintenance_type_id")
+  requestNumber     String    @unique @map("request_number")
+  description       String
+  status            String    @default("OPEN")
+  cost              Decimal?  @map("cost")
+  resultNotes       String?   @map("result_notes")
+  requestedAt       DateTime  @default(now()) @map("requested_at")
+  performedAt       DateTime? @map("performed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  asset           Asset                 @relation(fields: [assetId], references: [id])
+  maintenanceType MaintenanceType       @relation(fields: [maintenanceTypeId], references: [id])
+  materials       MaintenanceMaterial[]
+
+  @@index([assetId])
+  @@index([maintenanceTypeId])
+  @@index([status])
+  @@map("maintenance_requests")
+}
+
+model MaintenanceMaterial {
+  id                   String   @id @default(uuid())
+  maintenanceRequestId String   @map("maintenance_request_id")
+  materialName         String   @map("material_name")
+  quantity             Decimal? @map("quantity")
+  unitCost             Decimal  @map("unit_cost")
+  notes                String?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  maintenanceRequest MaintenanceRequest @relation(fields: [maintenanceRequestId], references: [id], onDelete: Cascade)
+
+  @@index([maintenanceRequestId])
+  @@map("maintenance_materials")
+}
+
+model AssetMovement {
+  id                     String   @id @default(uuid())
+  assetId                String   @map("asset_id")
+  movementType           String   @map("movement_type")
+  fromOrganizationUnitId String?  @map("from_organization_unit_id")
+  toOrganizationUnitId   String?  @map("to_organization_unit_id")
+  fromEmployeeId         String?  @map("from_employee_id")
+  toEmployeeId           String?  @map("to_employee_id")
+  fromStatusId           String?  @map("from_status_id")
+  toStatusId             String?  @map("to_status_id")
+  documentNumber         String?  @map("document_number")
+  notes                  String?
+  createdByUserId        String?  @map("created_by_user_id")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  asset                Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fromOrganizationUnit OrganizationUnit? @relation("AssetMovementFromOrganization", fields: [fromOrganizationUnitId], references: [id])
+  toOrganizationUnit   OrganizationUnit? @relation("AssetMovementToOrganization", fields: [toOrganizationUnitId], references: [id])
+  fromEmployee         Employee?         @relation("AssetMovementFromEmployee", fields: [fromEmployeeId], references: [id])
+  toEmployee           Employee?         @relation("AssetMovementToEmployee", fields: [toEmployeeId], references: [id])
+  fromStatus           AssetStatus?      @relation("AssetMovementFromStatus", fields: [fromStatusId], references: [id])
+  toStatus             AssetStatus?      @relation("AssetMovementToStatus", fields: [toStatusId], references: [id])
+  createdByUser        User?             @relation(fields: [createdByUserId], references: [id])
+
+  @@index([assetId])
+  @@index([movementType])
+  @@index([createdAt])
+  @@map("asset_movements")
+}
+
+model AssetAttachment {
+  id             String   @id @default(uuid())
+  assetId        String   @map("asset_id")
+  attachmentType String   @map("attachment_type")
+  title          String
+  fileUrl        String   @map("file_url")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([attachmentType])
+  @@map("asset_attachments")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  username    String?
+  action      String
+  module      String
+  entityType  String?  @map("entity_type")
+  entityId    String?  @map("entity_id")
+  description String?
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model AssetTransferRequest {
+  id                     String    @id @default(uuid())
+  assetId                String    @map("asset_id")
+  fromOrganizationUnitId String?   @map("from_organization_unit_id")
+  toOrganizationUnitId   String    @map("to_organization_unit_id")
+  documentNumber         String?   @map("document_number")
+  notes                  String?
+  status                 String    @default("PENDING")
+  requestedByUserId      String?   @map("requested_by_user_id")
+  requestedAt            DateTime  @default(now()) @map("requested_at")
+  decidedByUserId        String?   @map("decided_by_user_id")
+  decidedAt              DateTime? @map("decided_at")
+  decisionNotes          String?   @map("decision_notes")
+
+  asset                Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fromOrganizationUnit OrganizationUnit? @relation("TransferRequestFromOrganization", fields: [fromOrganizationUnitId], references: [id])
+  toOrganizationUnit   OrganizationUnit  @relation("TransferRequestToOrganization", fields: [toOrganizationUnitId], references: [id])
+  requestedByUser      User?             @relation("TransferRequestedBy", fields: [requestedByUserId], references: [id])
+  decidedByUser        User?             @relation("TransferDecidedBy", fields: [decidedByUserId], references: [id])
+
+  @@index([assetId])
+  @@index([status])
+  @@map("asset_transfer_requests")
+}
