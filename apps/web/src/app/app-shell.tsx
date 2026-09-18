@@ -17,7 +17,8 @@ type AppShellProps = {
     | "maintenance"
     | "reports"
     | "audit-log"
-    | "transfer-requests";
+    | "transfer-requests"
+    | "admin";
   badge?: string;
   children: React.ReactNode;
   subtitle: string;
@@ -43,6 +44,17 @@ const navItems = [
     href: "/audit-log",
     label: "سجل التدقيق",
     permission: "AUDIT_LOG_VIEW",
+  },
+  {
+    key: "admin",
+    href: "/admin",
+    label: "الإدارة",
+    permissions: [
+      "USERS_MANAGE",
+      "ROLES_MANAGE",
+      "ORG_UNITS_MANAGE",
+      "ASSET_CATALOG_MANAGE",
+    ],
   },
 ] as const;
 
@@ -81,9 +93,13 @@ export function AppShell({
         </div>
         <nav className={styles.nav} aria-label="القائمة الرئيسية">
           {navItems
-            .filter(
-              (item) => !("permission" in item) || hasPermission(item.permission),
-            )
+            .filter((item) => {
+              if ("permissions" in item) {
+                return item.permissions.some((code) => hasPermission(code));
+              }
+
+              return !("permission" in item) || hasPermission(item.permission);
+            })
             .map((item) => (
               <Link
                 className={item.key === active ? styles.activeNav : ""}

@@ -116,7 +116,11 @@ export class AuthService {
 
     const permissions = new Set<string>();
     let hasCentralScope = false;
-    const explicitScopeOrgUnitIds = new Set<string>();
+    // "unit": مسؤول الجهة يرى جهته المحددة فقط، حتى لو كانت تملك جهات تابعة (بحسب القرار المعتمد).
+    const unitScopeOrgUnitIds = new Set<string>();
+    // نطاقات أخرى غير مركزية وغير "unit" (مثل "read_only" للمدقق) تبقى موسّعة لتشمل الجهات التابعة
+    // لأن الغرض منها مراجعة عامة وليس إدارة جهة واحدة.
+    const broadScopeOrgUnitIds = new Set<string>();
 
     for (const userRole of user.roles) {
       if (!userRole.role.isActive) {
@@ -127,32 +131,38 @@ export class AuthService {
         permissions.add(rolePermission.permission.code);
       }
 
+      const scopeOrgUnitId =
+        userRole.organizationUnitId ?? user.organizationUnitId;
+
       if (userRole.role.scopeLevel === 'central') {
         hasCentralScope = true;
+      } else if (userRole.role.scopeLevel === 'unit') {
+        unitScopeOrgUnitIds.add(scopeOrgUnitId);
       } else {
-        explicitScopeOrgUnitIds.add(
-          userRole.organizationUnitId ?? user.organizationUnitId,
-        );
+        broadScopeOrgUnitIds.add(scopeOrgUnitId);
       }
     }
 
     let allowedOrganizationUnitIds: string[] | null = null;
 
     if (!hasCentralScope) {
-      const allOrgUnits = await this.prisma.organizationUnit.findMany({
-        select: { id: true, parentId: true },
-      });
+      const combined = new Set<string>(unitScopeOrgUnitIds);
 
-      const scopeRoots =
-        explicitScopeOrgUnitIds.size > 0
-          ? Array.from(explicitScopeOrgUnitIds)
-          : [user.organizationUnitId];
+      if (broadScopeOrgUnitIds.size > 0) {
+        const allOrgUnits = await this.prisma.organizationUnit.findMany({
+          select: { id: true, parentId: true },
+        });
 
-      const combined = new Set<string>();
-      for (const rootId of scopeRoots) {
-        for (const id of collectOrgUnitWithDescendants(rootId, allOrgUnits)) {
-          combined.add(id);
+        for (const rootId of broadScopeOrgUnitIds) {
+          for (const id of collectOrgUnitWithDescendants(rootId, allOrgUnits)) {
+            combined.add(id);
+          }
         }
+      }
+
+      if (combined.size === 0) {
+        // مستخدم بلا أدوار مفعّلة: يقتصر افتراضياً على جهته فقط بدون توسّع.
+        combined.add(user.organizationUnitId);
       }
 
       allowedOrganizationUnitIds = Array.from(combined);

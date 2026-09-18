@@ -196,6 +196,11 @@ const permissions = [
   },
   { code: 'USERS_MANAGE', name: 'إدارة المستخدمين', module: 'admin' },
   { code: 'ROLES_MANAGE', name: 'إدارة الأدوار والصلاحيات', module: 'admin' },
+  {
+    code: 'ASSET_CATALOG_MANAGE',
+    name: 'إدارة أصناف وأنواع الموجودات',
+    module: 'admin',
+  },
 ];
 
 const allPermissionCodes = permissions.map((permission) => permission.code);
