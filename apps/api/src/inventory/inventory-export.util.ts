@@ -1,7 +1,14 @@
-import { join } from 'node:path';
 import { Workbook } from 'exceljs';
-import PDFDocument from 'pdfkit';
 import { shapeArabicForPdf } from '../common/arabic-pdf-text.util';
+import {
+  drawRtlTable,
+  formatDateArabic,
+  PAGE_BOTTOM,
+  PAGE_LEFT,
+  PAGE_WIDTH,
+  renderPdfDocumentToBuffer,
+  ROW_HEIGHT,
+} from '../common/pdf-report.util';
 
 type CountBucket = {
   id: string;
@@ -26,19 +33,6 @@ export type InventorySummaryResult = {
   totalBookValue: number;
   categories: CategorySummary[];
 };
-
-const ARABIC_FONT_REGULAR_PATH = join(
-  process.cwd(),
-  'assets',
-  'fonts',
-  'Tajawal-Regular.ttf',
-);
-const ARABIC_FONT_BOLD_PATH = join(
-  process.cwd(),
-  'assets',
-  'fonts',
-  'Tajawal-Bold.ttf',
-);
 
 export async function buildInventoryExcelBuffer(
   summary: InventorySummaryResult,
@@ -100,98 +94,10 @@ export async function buildInventoryExcelBuffer(
   return Buffer.from(buffer);
 }
 
-const PAGE_WIDTH = 515;
-const PAGE_LEFT = 40;
-const ROW_HEIGHT = 22;
-const PAGE_BOTTOM = 780;
-
-function drawRtlTable(
-  doc: PDFKit.PDFDocument,
-  headersLtr: string[],
-  rowsLtr: string[][],
-  columnWidthsLtr: number[],
-) {
-  // الأعمدة تصل بترتيبها المنطقي (يمين لليسار)؛ نعكسها هنا لأن الرسم يتم بإحداثيات x تتزايد يساراً،
-  // فيصبح أول عمود منطقي هو الأقصى يميناً كما يُقرأ بالعربية.
-  const headers = [...headersLtr].reverse();
-  const rows = rowsLtr.map((row) => [...row].reverse());
-  const columnWidths = [...columnWidthsLtr].reverse();
-
-  const drawHeaderRow = () => {
-    let x = PAGE_LEFT;
-    const y = doc.y;
-
-    doc.font('arabic-bold');
-    for (let i = 0; i < headers.length; i += 1) {
-      const width = columnWidths[i];
-      doc.rect(x, y, width, ROW_HEIGHT).fillAndStroke('#eef3f1', '#c7d2ce');
-      doc
-        .fillColor('#0f2f28')
-        .text(shapeArabicForPdf(headers[i]), x + 6, y + 6, {
-          width: width - 12,
-          align: 'right',
-        });
-      x += width;
-    }
-    doc.font('arabic');
-    doc.y = y + ROW_HEIGHT;
-  };
-
-  drawHeaderRow();
-
-  for (const row of rows) {
-    if (doc.y + ROW_HEIGHT > PAGE_BOTTOM) {
-      doc.addPage();
-      drawHeaderRow();
-    }
-
-    let x = PAGE_LEFT;
-    const y = doc.y;
-
-    for (let i = 0; i < row.length; i += 1) {
-      const width = columnWidths[i];
-      doc.rect(x, y, width, ROW_HEIGHT).stroke('#e2e8e6');
-      doc.fillColor('#1c2b27').text(shapeArabicForPdf(row[i]), x + 6, y + 6, {
-        width: width - 12,
-        align: 'right',
-      });
-      x += width;
-    }
-
-    doc.y = y + ROW_HEIGHT;
-  }
-
-  doc.moveDown();
-}
-
-function formatDateArabic(iso: string): string {
-  if (!iso) {
-    return '';
-  }
-
-  return new Intl.DateTimeFormat('ar-IQ', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    // نفرض الأرقام اللاتينية لأن خط Tajawal المضمّن بالـPDF لا يضمّن أشكال الأرقام الهندية العربية.
-    numberingSystem: 'latn',
-  }).format(new Date(iso));
-}
-
 export async function buildInventoryPdfBuffer(
   summary: InventorySummaryResult,
 ): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
-    const chunks: Buffer[] = [];
-
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-
-    doc.registerFont('arabic', ARABIC_FONT_REGULAR_PATH);
-    doc.registerFont('arabic-bold', ARABIC_FONT_BOLD_PATH);
-    doc.font('arabic');
-
+  return renderPdfDocumentToBuffer((doc) => {
     doc
       .fontSize(16)
       .text(shapeArabicForPdf('كشف الجرد حسب التصنيف والنوع'), PAGE_LEFT, 40, {
@@ -265,7 +171,5 @@ export async function buildInventoryPdfBuffer(
         );
       }
     }
-
-    doc.end();
   });
 }
