@@ -15,14 +15,14 @@ export class UsersController {
 
   @RequirePermissions('USERS_MANAGE')
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.findAll(user.allowedOrganizationUnitIds);
   }
 
   @RequirePermissions('USERS_MANAGE')
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.findOne(id, user.allowedOrganizationUnitIds);
   }
 
   @RequirePermissions('USERS_MANAGE')
@@ -35,6 +35,7 @@ export class UsersController {
     return this.usersService.create(
       body as Record<string, unknown>,
       this.toActor(user, request),
+      user.allowedOrganizationUnitIds,
     );
   }
 
@@ -50,6 +51,7 @@ export class UsersController {
       id,
       body as Record<string, unknown>,
       this.toActor(user, request),
+      user.allowedOrganizationUnitIds,
     );
   }
 }

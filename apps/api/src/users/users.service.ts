@@ -47,27 +47,40 @@ export class UsersService {
     },
   };
 
-  findAll() {
+  findAll(allowedOrganizationUnitIds: string[] | null) {
     return this.prisma.user.findMany({
+      where: {
+        organizationUnitId: allowedOrganizationUnitIds
+          ? { in: allowedOrganizationUnitIds }
+          : undefined,
+      },
       orderBy: { fullName: 'asc' },
       select: this.userSelect,
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, allowedOrganizationUnitIds: string[] | null) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: this.userSelect,
     });
 
-    if (!user) {
+    if (
+      !user ||
+      (allowedOrganizationUnitIds &&
+        !allowedOrganizationUnitIds.includes(user.organizationUnit.id))
+    ) {
       throw new BadRequestException('المستخدم المحدد غير موجود.');
     }
 
     return user;
   }
 
-  async create(input: CreateUserInput, actor: AuditActor) {
+  async create(
+    input: CreateUserInput,
+    actor: AuditActor,
+    allowedOrganizationUnitIds: string[] | null,
+  ) {
     const fullName = this.normalizeRequiredString(
       input.fullName,
       'الاسم الكامل مطلوب.',
@@ -93,11 +106,20 @@ export class UsersService {
         where: { id: input.organizationUnitId },
       }),
       this.prisma.user.findUnique({ where: { username } }),
-      this.resolveRoles(input.roleIds),
+      this.resolveRoles(input.roleIds, allowedOrganizationUnitIds),
     ]);
 
     if (!organizationUnit) {
       throw new BadRequestException('الجهة التنظيمية المحددة غير موجودة.');
+    }
+
+    if (
+      allowedOrganizationUnitIds &&
+      !allowedOrganizationUnitIds.includes(organizationUnit.id)
+    ) {
+      throw new BadRequestException(
+        'لا يمكنك إضافة مستخدم خارج نطاق جهتك التنظيمية.',
+      );
     }
 
     if (existingUser) {
@@ -141,10 +163,19 @@ export class UsersService {
     return createdUser;
   }
 
-  async update(id: string, input: UpdateUserInput, actor: AuditActor) {
+  async update(
+    id: string,
+    input: UpdateUserInput,
+    actor: AuditActor,
+    allowedOrganizationUnitIds: string[] | null,
+  ) {
     const existingUser = await this.prisma.user.findUnique({ where: { id } });
 
-    if (!existingUser) {
+    if (
+      !existingUser ||
+      (allowedOrganizationUnitIds &&
+        !allowedOrganizationUnitIds.includes(existingUser.organizationUnitId))
+    ) {
       throw new BadRequestException('المستخدم المحدد غير موجود.');
     }
 
@@ -159,11 +190,22 @@ export class UsersService {
     const organizationUnitId =
       input.organizationUnitId ?? existingUser.organizationUnitId;
 
+    if (
+      allowedOrganizationUnitIds &&
+      !allowedOrganizationUnitIds.includes(organizationUnitId)
+    ) {
+      throw new BadRequestException(
+        'لا يمكنك نقل المستخدم إلى جهة خارج نطاق صلاحيتك.',
+      );
+    }
+
     const [organizationUnit, roles] = await Promise.all([
       this.prisma.organizationUnit.findUnique({
         where: { id: organizationUnitId },
       }),
-      input.roleIds ? this.resolveRoles(input.roleIds) : null,
+      input.roleIds
+        ? this.resolveRoles(input.roleIds, allowedOrganizationUnitIds)
+        : null,
     ]);
 
     if (!organizationUnit) {
@@ -222,7 +264,10 @@ export class UsersService {
     return updatedUser;
   }
 
-  private async resolveRoles(roleIds: string[] | undefined) {
+  private async resolveRoles(
+    roleIds: string[] | undefined,
+    allowedOrganizationUnitIds: string[] | null,
+  ) {
     const uniqueRoleIds = Array.from(new Set(roleIds ?? []));
 
     if (uniqueRoleIds.length === 0) {
@@ -235,6 +280,17 @@ export class UsersService {
 
     if (roles.length !== uniqueRoleIds.length) {
       throw new BadRequestException('أحد الأدوار المحددة غير موجود.');
+    }
+
+    // مسؤول غير مركزي لا يملك نطاقاً كاملاً، فلا يجوز له منح دور مركزي لأي مستخدم
+    // لأن ذلك يعادل تصعيد صلاحياته خارج جهته.
+    if (
+      allowedOrganizationUnitIds &&
+      roles.some((role) => role.scopeLevel === 'central')
+    ) {
+      throw new BadRequestException(
+        'لا يمكنك إسناد دور بنطاق مركزي لأنك لا تملك صلاحية مركزية.',
+      );
     }
 
     return roles;
