@@ -18,6 +18,7 @@ type AppShellProps = {
     | "reports"
     | "audit-log"
     | "transfer-requests"
+    | "write-off-requests"
     | "admin";
   badge?: string;
   children: React.ReactNode;
@@ -37,6 +38,12 @@ const navItems = [
     href: "/transfer-requests",
     label: "اعتماد النقل",
     permission: "ASSETS_TRANSFER_APPROVE",
+  },
+  {
+    key: "write-off-requests",
+    href: "/write-off-requests",
+    label: "اعتماد الشطب",
+    permission: "ASSETS_WRITEOFF_APPROVE",
   },
   { key: "reports", href: "/reports", label: "التقارير" },
   {

@@ -245,8 +245,8 @@ const actionTabs: {
   },
   {
     key: "deactivate",
-    label: "شطب / تعطيل",
-    hint: "إنهاء خدمة الموجود بشكل رسمي مع مستند الشطب",
+    label: "طلب شطب",
+    hint: "تقديم طلب شطب رسمي بانتظار اعتماد الجهة المخولة",
     permission: "ASSETS_DEACTIVATE",
   },
 ];
@@ -870,7 +870,7 @@ export function AssetDetailsView({
               onSubmit={(event) => {
                 if (
                   !window.confirm(
-                    "الشطب إجراء رسمي نهائي يمنع أي تسليم أو نقل أو صيانة جديدة لهذا الموجود. هل تريد المتابعة؟",
+                    "سيتم إرسال طلب شطب هذا الموجود بانتظار اعتماد الجهة المخولة، ولن يتم تعطيله فوراً. هل تريد المتابعة؟",
                   )
                 ) {
                   event.preventDefault();
@@ -880,7 +880,7 @@ export function AssetDetailsView({
                 submitAssetAction(
                   event,
                   "deactivate",
-                  "تم شطب/تعطيل الموجود.",
+                  "تم إرسال طلب الشطب وهو الآن بانتظار الموافقة.",
                   "OTHER",
                   "مستند الشطب",
                   "PATCH",
@@ -908,7 +908,7 @@ export function AssetDetailsView({
                 />
               </label>
               <button disabled={isSubmitting} type="submit">
-                اعتماد الشطب
+                إرسال طلب الشطب
               </button>
             </form>
           )}

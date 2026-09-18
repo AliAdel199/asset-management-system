@@ -17,6 +17,7 @@ import { ReferenceDataModule } from './reference-data/reference-data.module';
 import { RolesModule } from './roles/roles.module';
 import { TransferRequestsModule } from './transfer-requests/transfer-requests.module';
 import { UsersModule } from './users/users.module';
+import { WriteOffRequestsModule } from './write-off-requests/write-off-requests.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { UsersModule } from './users/users.module';
     RolesModule,
     TransferRequestsModule,
     UsersModule,
+    WriteOffRequestsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -682,16 +682,12 @@ export class AssetsService {
     return attachment;
   }
 
-  async deactivate(id: string, input: DeactivateAssetInput, actor: AuditActor) {
-    const asset = await this.prisma.asset.findUnique({ where: { id } });
-
-    if (!asset || asset.isDeleted) {
-      throw new BadRequestException(
-        'Asset is not available or already inactive.',
-      );
-    }
-
-    // BR-026 / BR-023: الشطب يجب أن يتضمن رقم مستند وسبباً موثقاً.
+  async requestWriteOff(
+    id: string,
+    input: DeactivateAssetInput,
+    actor: AuditActor,
+  ) {
+    // BR-026 / BR-023 و OD-008: الشطب يتطلب رقم مستند وسبباً موثقاً، وموافقة جهة مخولة قبل التنفيذ.
     const documentNumber = this.normalizeOptionalString(input.documentNumber);
     const reason = this.normalizeOptionalString(input.reason);
 
@@ -703,37 +699,48 @@ export class AssetsService {
       throw new BadRequestException('سبب الشطب مطلوب.');
     }
 
-    const deactivatedAsset = await this.prisma.$transaction(async (tx) => {
-      await tx.asset.update({
-        where: { id },
-        data: { isDeleted: true },
-      });
+    const [asset, existingPendingRequest] = await Promise.all([
+      this.prisma.asset.findUnique({ where: { id } }),
+      this.prisma.assetWriteOffRequest.findFirst({
+        where: { assetId: id, status: 'PENDING' },
+        select: { id: true },
+      }),
+    ]);
 
-      await tx.assetMovement.create({
-        data: {
-          assetId: id,
-          movementType: 'DEACTIVATE',
-          documentNumber,
-          notes: reason,
-        },
-      });
+    if (!asset || asset.isDeleted) {
+      throw new BadRequestException(
+        'Asset is not available or already inactive.',
+      );
+    }
 
-      return tx.asset.findUniqueOrThrow({
-        where: { id },
-        include: this.assetInclude,
-      });
+    if (existingPendingRequest) {
+      throw new BadRequestException(
+        'يوجد طلب شطب بانتظار الموافقة لهذا الموجود بالفعل.',
+      );
+    }
+
+    const writeOffRequest = await this.prisma.assetWriteOffRequest.create({
+      data: {
+        assetId: id,
+        organizationUnitId:
+          asset.currentHolderOrganizationUnitId ??
+          asset.owningOrganizationUnitId,
+        documentNumber,
+        reason,
+        requestedByUserId: actor.userId ?? null,
+      },
     });
 
     await this.auditLogService.record({
       ...actor,
-      action: 'ASSET_DEACTIVATE',
+      action: 'ASSET_WRITEOFF_REQUEST',
       module: 'assets',
       entityType: 'Asset',
-      entityId: deactivatedAsset.id,
-      description: `تعطيل/شطب الموجود ${deactivatedAsset.internalNumber}.`,
+      entityId: asset.id,
+      description: `طلب شطب الموجود ${asset.internalNumber} (بانتظار الموافقة).`,
     });
 
-    return deactivatedAsset;
+    return writeOffRequest;
   }
 
   private assertRequired(input: CreateAssetInput) {

@@ -59,13 +59,13 @@ export class AssetsController {
 
   @RequirePermissions('ASSETS_DEACTIVATE')
   @Patch(':id/deactivate')
-  deactivate(
+  requestWriteOff(
     @Param('id') id: string,
     @Body() body: unknown,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.assetsService.deactivate(
+    return this.assetsService.requestWriteOff(
       id,
       body as Record<string, unknown>,
       this.toActor(user, request),

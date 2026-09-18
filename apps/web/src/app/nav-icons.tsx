@@ -68,6 +68,13 @@ export const navIcons: Record<string, React.ReactNode> = {
       <path d="m9 13 2.5 2.5L15 11" />
     </svg>
   ),
+  "write-off-requests": (
+    <svg {...commonProps}>
+      <rect height="16" rx="2" width="14" x="5" y="4" />
+      <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+      <path d="m9 10 6 6M15 10l-6 6" />
+    </svg>
+  ),
   admin: (
     <svg {...commonProps}>
       <circle cx="12" cy="8" r="3.2" />
