@@ -34,13 +34,18 @@ export default tseslint.config(
   },
   {
     // اختبارات الوحدة تبني كائنات mock بسيطة عبر `as any` عمداً بدل تكرار الأنواع الضخمة
-    // المولّدة من Prisma - هذا نمط شائع ومقبول لملفات الاختبار تحديداً.
-    files: ['**/*.spec.ts'],
+    // المولّدة من Prisma، واختبارات e2e تتعامل مع استجابات supertest غير المُصنّفة (`any`)
+    // - هذا نمط شائع ومقبول لملفات الاختبار وأدواتها المساعدة تحديداً.
+    files: ['**/*.spec.ts', 'test/**/*.ts', 'src/test-mocks/**/*.ts'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      // src/test-mocks يحتاج `import x = require(...)` تحديداً لضمان الحصول على نفس
+      // القيمة التي يرجعها require() دون التباس interop، وهذا ضروري هنا لا مجرد أسلوب.
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 );

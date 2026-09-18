@@ -8,7 +8,7 @@ on:
 
 jobs:
   api:
-    name: API (build, lint, test, migrations)
+    name: API (build, lint, unit+e2e tests, migrations)
     runs-on: ubuntu-latest
 
     services:
@@ -63,6 +63,10 @@ jobs:
       - name: Run seed script against the fresh database
         working-directory: apps/api
         run: node prisma/seed.cjs
+
+      - name: E2E tests (real HTTP requests against the seeded database)
+        working-directory: apps/api
+        run: npm run test:e2e
 
   web:
     name: Web (build, lint)
