@@ -56,39 +56,45 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function csvCell(value: string | number) {
-  return `"${String(value).replace(/"/g, '""')}"`;
-}
+async function downloadReportExport(
+  format: "excel" | "pdf",
+  filters: { organizationUnitId: string; includeArchived: boolean },
+  onError: (message: string) => void,
+) {
+  const params = new URLSearchParams();
 
-function exportSummaryToExcel(summary: InventorySummary) {
-  const rows: (string | number)[][] = [
-    ["التصنيف", "التبويب", "الاسم", "العدد", "القيمة الدفترية"],
-    ["الإجمالي", "الإجمالي", "كل الموجودات", summary.totalCount, summary.totalBookValue],
-  ];
+  if (filters.organizationUnitId) {
+    params.set("organizationUnitId", filters.organizationUnitId);
+  }
 
-  summary.categories.forEach((category) => {
-    category.types.forEach((type) => {
-      rows.push([category.name, "نوع المادة", type.name, type.count, type.bookValue]);
-    });
+  if (filters.includeArchived) {
+    params.set("includeArchived", "true");
+  }
 
-    category.statuses.forEach((status) => {
-      rows.push([category.name, "الحالة", status.name, status.count, status.bookValue]);
-    });
-  });
+  try {
+    const response = await apiFetch(
+      `/inventory/summary/export/${format}?${params.toString()}`,
+    );
 
-  // نضيف BOM حتى يفتح Excel الملف بترميز UTF-8 صحيح للنصوص العربية.
-  const csvContent =
-    "﻿" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+    if (!response.ok) {
+      throw new Error("تعذر توليد الملف.");
+    }
 
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `inventory-report-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const extension = format === "excel" ? "xlsx" : "pdf";
+    link.href = url;
+    link.download = `inventory-report-${new Date().toISOString().slice(0, 10)}.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch {
+    onError(
+      format === "excel" ? "تعذر تصدير ملف Excel." : "تعذر تصدير ملف PDF.",
+    );
+  }
 }
 
 export function InventoryReport() {
@@ -99,6 +105,22 @@ export function InventoryReport() {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [summary, setSummary] = useState<InventorySummary>(emptySummary);
   const [message, setMessage] = useState("جاري تحميل كشف الجرد");
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function handleExport(format: "excel" | "pdf") {
+    setIsExporting(true);
+    setMessage("");
+
+    try {
+      await downloadReportExport(
+        format,
+        { organizationUnitId, includeArchived },
+        setMessage,
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   useEffect(() => {
     let ignore = false;
@@ -189,10 +211,18 @@ export function InventoryReport() {
           />
           إظهار الموجودات المعطلة
         </label>
-        <button onClick={() => window.print()} type="button">
-          طباعة / تصدير PDF
+        <button
+          disabled={isExporting}
+          onClick={() => void handleExport("pdf")}
+          type="button"
+        >
+          تصدير PDF
         </button>
-        <button onClick={() => exportSummaryToExcel(summary)} type="button">
+        <button
+          disabled={isExporting}
+          onClick={() => void handleExport("excel")}
+          type="button"
+        >
           تصدير Excel
         </button>
       </div>
