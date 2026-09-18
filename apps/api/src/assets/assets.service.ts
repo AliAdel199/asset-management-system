@@ -137,6 +137,7 @@ export class AssetsService {
         fromOrganizationUnit: { select: { id: true, name: true, code: true } },
         toOrganizationUnit: { select: { id: true, name: true, code: true } },
         requestedByUser: { select: { id: true, fullName: true } },
+        attachments: { orderBy: { createdAt: 'desc' as const } },
       },
     },
     generalDetails: true,
@@ -145,7 +146,10 @@ export class AssetsService {
     realEstateDetails: true,
     maintenanceRequests: {
       orderBy: { createdAt: 'desc' as const },
-      include: { maintenanceType: true },
+      include: {
+        maintenanceType: true,
+        attachments: { orderBy: { createdAt: 'desc' as const } },
+      },
     },
     movements: {
       orderBy: { createdAt: 'desc' as const },

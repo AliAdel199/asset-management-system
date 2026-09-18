@@ -266,6 +266,7 @@ model Asset {
   @@index([statusId])
   @@index([owningOrganizationUnitId])
   @@index([currentHolderOrganizationUnitId])
+  @@index([maintenanceIntervalId])
   @@map("assets")
 }
 
@@ -355,6 +356,7 @@ model MaintenanceRequest {
   asset           Asset                 @relation(fields: [assetId], references: [id])
   maintenanceType MaintenanceType       @relation(fields: [maintenanceTypeId], references: [id])
   materials       MaintenanceMaterial[]
+  attachments     AssetAttachment[]
 
   @@index([assetId])
   @@index([maintenanceTypeId])
@@ -408,17 +410,28 @@ model AssetMovement {
 }
 
 model AssetAttachment {
-  id             String   @id @default(uuid())
-  assetId        String   @map("asset_id")
-  attachmentType String   @map("attachment_type")
-  title          String
-  fileUrl        String   @map("file_url")
-  notes          String?
-  createdAt      DateTime @default(now()) @map("created_at")
+  id                   String   @id @default(uuid())
+  // المرفق يرتبط بسجل واحد فقط من الأربعة أدناه (موجود، صيانة، نقل، أو شطب)؛
+  // يُفرض هذا الشرط في طبقة الخدمة لأن Prisma لا يدعم قيود CHECK متعددة الأعمدة هنا.
+  assetId              String?  @map("asset_id")
+  maintenanceRequestId String?  @map("maintenance_request_id")
+  transferRequestId    String?  @map("transfer_request_id")
+  writeOffRequestId    String?  @map("write_off_request_id")
+  attachmentType       String   @map("attachment_type")
+  title                String
+  fileUrl              String   @map("file_url")
+  notes                String?
+  createdAt            DateTime @default(now()) @map("created_at")
 
-  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset              Asset?                @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  maintenanceRequest MaintenanceRequest?   @relation(fields: [maintenanceRequestId], references: [id], onDelete: Cascade)
+  transferRequest    AssetTransferRequest? @relation(fields: [transferRequestId], references: [id], onDelete: Cascade)
+  writeOffRequest    AssetWriteOffRequest? @relation(fields: [writeOffRequestId], references: [id], onDelete: Cascade)
 
   @@index([assetId])
+  @@index([maintenanceRequestId])
+  @@index([transferRequestId])
+  @@index([writeOffRequestId])
   @@index([attachmentType])
   @@map("asset_attachments")
 }
@@ -463,6 +476,7 @@ model AssetTransferRequest {
   toOrganizationUnit   OrganizationUnit  @relation("TransferRequestToOrganization", fields: [toOrganizationUnitId], references: [id])
   requestedByUser      User?             @relation("TransferRequestedBy", fields: [requestedByUserId], references: [id])
   decidedByUser        User?             @relation("TransferDecidedBy", fields: [decidedByUserId], references: [id])
+  attachments          AssetAttachment[]
 
   @@index([assetId])
   @@index([status])
@@ -482,10 +496,11 @@ model AssetWriteOffRequest {
   decidedAt          DateTime? @map("decided_at")
   decisionNotes      String?   @map("decision_notes")
 
-  asset            Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  organizationUnit OrganizationUnit @relation("WriteOffRequestOrganization", fields: [organizationUnitId], references: [id])
-  requestedByUser  User?            @relation("WriteOffRequestedBy", fields: [requestedByUserId], references: [id])
-  decidedByUser    User?            @relation("WriteOffDecidedBy", fields: [decidedByUserId], references: [id])
+  asset            Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  organizationUnit OrganizationUnit  @relation("WriteOffRequestOrganization", fields: [organizationUnitId], references: [id])
+  requestedByUser  User?             @relation("WriteOffRequestedBy", fields: [requestedByUserId], references: [id])
+  decidedByUser    User?             @relation("WriteOffDecidedBy", fields: [decidedByUserId], references: [id])
+  attachments      AssetAttachment[]
 
   @@index([assetId])
   @@index([status])

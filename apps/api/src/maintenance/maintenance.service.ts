@@ -25,6 +25,12 @@ type MaintenanceMaterialInput = {
   notes?: string | null;
 };
 
+type AddMaintenanceAttachmentInput = {
+  attachmentType?: string;
+  title?: string;
+  notes?: string | null;
+};
+
 @Injectable()
 export class MaintenanceService {
   constructor(
@@ -62,6 +68,9 @@ export class MaintenanceService {
     maintenanceType: true,
     materials: {
       orderBy: { createdAt: 'asc' as const },
+    },
+    attachments: {
+      orderBy: { createdAt: 'desc' as const },
     },
   };
 
@@ -360,6 +369,55 @@ export class MaintenanceService {
     });
 
     return updatedRequest;
+  }
+
+  async addAttachment(
+    id: string,
+    input: AddMaintenanceAttachmentInput,
+    file: Express.Multer.File | undefined,
+    actor: AuditActor,
+  ) {
+    const request = await this.prisma.maintenanceRequest.findUnique({
+      where: { id },
+    });
+
+    if (!request) {
+      throw new BadRequestException('طلب الصيانة المحدد غير موجود.');
+    }
+
+    const attachmentType = this.normalizeOptionalString(input.attachmentType);
+    const title = this.normalizeOptionalString(input.title);
+
+    if (!attachmentType || !title) {
+      throw new BadRequestException('Attachment type and title are required.');
+    }
+
+    if (!file) {
+      throw new BadRequestException('يجب اختيار ملف لرفعه.');
+    }
+
+    const fileUrl = `/uploads/attachments/${file.filename}`;
+
+    const attachment = await this.prisma.assetAttachment.create({
+      data: {
+        maintenanceRequestId: id,
+        attachmentType,
+        title,
+        fileUrl,
+        notes: this.normalizeOptionalString(input.notes),
+      },
+    });
+
+    await this.auditLogService.record({
+      ...actor,
+      action: 'MAINTENANCE_ATTACHMENT_UPLOAD',
+      module: 'maintenance',
+      entityType: 'MaintenanceRequest',
+      entityId: id,
+      description: `رفع مرفق (${attachmentType}) بعنوان "${title}" لطلب الصيانة ${request.requestNumber}.`,
+    });
+
+    return attachment;
   }
 
   private assertRequired(input: CreateMaintenanceRequestInput) {

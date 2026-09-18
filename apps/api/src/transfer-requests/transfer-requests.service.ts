@@ -3,6 +3,12 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import type { AuditActor } from '../audit-log/types';
 import { PrismaService } from '../prisma/prisma.service';
 
+type AddTransferAttachmentInput = {
+  attachmentType?: string;
+  title?: string;
+  notes?: string | null;
+};
+
 @Injectable()
 export class TransferRequestsService {
   constructor(
@@ -24,6 +30,9 @@ export class TransferRequestsService {
     toOrganizationUnit: { select: { id: true, name: true, code: true } },
     requestedByUser: { select: { id: true, fullName: true } },
     decidedByUser: { select: { id: true, fullName: true } },
+    attachments: {
+      orderBy: { createdAt: 'desc' as const },
+    },
   };
 
   findMany(allowedOrganizationUnitIds: string[] | null, status?: string) {
@@ -145,6 +154,55 @@ export class TransferRequestsService {
     });
 
     return updatedRequest;
+  }
+
+  async addAttachment(
+    id: string,
+    input: AddTransferAttachmentInput,
+    file: Express.Multer.File | undefined,
+    actor: AuditActor,
+  ) {
+    const transferRequest = await this.prisma.assetTransferRequest.findUnique({
+      where: { id },
+    });
+
+    if (!transferRequest) {
+      throw new BadRequestException('طلب النقل المحدد غير موجود.');
+    }
+
+    const attachmentType = this.normalizeOptionalString(input.attachmentType);
+    const title = this.normalizeOptionalString(input.title);
+
+    if (!attachmentType || !title) {
+      throw new BadRequestException('Attachment type and title are required.');
+    }
+
+    if (!file) {
+      throw new BadRequestException('يجب اختيار ملف لرفعه.');
+    }
+
+    const fileUrl = `/uploads/attachments/${file.filename}`;
+
+    const attachment = await this.prisma.assetAttachment.create({
+      data: {
+        transferRequestId: id,
+        attachmentType,
+        title,
+        fileUrl,
+        notes: this.normalizeOptionalString(input.notes),
+      },
+    });
+
+    await this.auditLogService.record({
+      ...actor,
+      action: 'ASSET_TRANSFER_ATTACHMENT_UPLOAD',
+      module: 'assets',
+      entityType: 'Asset',
+      entityId: transferRequest.assetId,
+      description: `رفع مرفق (${attachmentType}) بعنوان "${title}" لطلب النقل.`,
+    });
+
+    return attachment;
   }
 
   private normalizeOptionalString(value: string | null | undefined) {

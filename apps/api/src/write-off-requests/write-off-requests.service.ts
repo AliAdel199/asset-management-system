@@ -3,6 +3,12 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import type { AuditActor } from '../audit-log/types';
 import { PrismaService } from '../prisma/prisma.service';
 
+type AddWriteOffAttachmentInput = {
+  attachmentType?: string;
+  title?: string;
+  notes?: string | null;
+};
+
 @Injectable()
 export class WriteOffRequestsService {
   constructor(
@@ -23,6 +29,9 @@ export class WriteOffRequestsService {
     organizationUnit: { select: { id: true, name: true, code: true } },
     requestedByUser: { select: { id: true, fullName: true } },
     decidedByUser: { select: { id: true, fullName: true } },
+    attachments: {
+      orderBy: { createdAt: 'desc' as const },
+    },
   };
 
   findMany(allowedOrganizationUnitIds: string[] | null, status?: string) {
@@ -147,6 +156,55 @@ export class WriteOffRequestsService {
     });
 
     return rejectedRequest;
+  }
+
+  async addAttachment(
+    id: string,
+    input: AddWriteOffAttachmentInput,
+    file: Express.Multer.File | undefined,
+    actor: AuditActor,
+  ) {
+    const writeOffRequest = await this.prisma.assetWriteOffRequest.findUnique({
+      where: { id },
+    });
+
+    if (!writeOffRequest) {
+      throw new BadRequestException('طلب الشطب المحدد غير موجود.');
+    }
+
+    const attachmentType = this.normalizeOptionalString(input.attachmentType);
+    const title = this.normalizeOptionalString(input.title);
+
+    if (!attachmentType || !title) {
+      throw new BadRequestException('Attachment type and title are required.');
+    }
+
+    if (!file) {
+      throw new BadRequestException('يجب اختيار ملف لرفعه.');
+    }
+
+    const fileUrl = `/uploads/attachments/${file.filename}`;
+
+    const attachment = await this.prisma.assetAttachment.create({
+      data: {
+        writeOffRequestId: id,
+        attachmentType,
+        title,
+        fileUrl,
+        notes: this.normalizeOptionalString(input.notes),
+      },
+    });
+
+    await this.auditLogService.record({
+      ...actor,
+      action: 'ASSET_WRITEOFF_ATTACHMENT_UPLOAD',
+      module: 'assets',
+      entityType: 'Asset',
+      entityId: writeOffRequest.assetId,
+      description: `رفع مرفق (${attachmentType}) بعنوان "${title}" لطلب الشطب.`,
+    });
+
+    return attachment;
   }
 
   private normalizeOptionalString(value: string | null | undefined) {
