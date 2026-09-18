@@ -17,6 +17,12 @@ import type { AuthenticatedUser } from '../auth/types';
 import type { AuditActor } from '../audit-log/types';
 import { attachmentMulterOptions } from './attachment-storage';
 import { AssetsService } from './assets.service';
+import { AddAssetAttachmentDto } from './dto/add-asset-attachment.dto';
+import { AssignAssetDto } from './dto/assign-asset.dto';
+import { ChangeAssetStatusDto } from './dto/change-asset-status.dto';
+import { CreateAssetDto } from './dto/create-asset.dto';
+import { DeactivateAssetDto } from './dto/deactivate-asset.dto';
+import { MoveAssetDto } from './dto/move-asset.dto';
 
 @Controller('assets')
 export class AssetsController {
@@ -47,27 +53,24 @@ export class AssetsController {
   @RequirePermissions('ASSETS_CREATE')
   @Post()
   create(
-    @Body() body: unknown,
+    @Body() body: CreateAssetDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.assetsService.create(
-      body as Record<string, unknown>,
-      this.toActor(user, request),
-    );
+    return this.assetsService.create(body, this.toActor(user, request));
   }
 
   @RequirePermissions('ASSETS_DEACTIVATE')
   @Patch(':id/deactivate')
   requestWriteOff(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: DeactivateAssetDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.assetsService.requestWriteOff(
       id,
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
     );
   }
@@ -76,15 +79,11 @@ export class AssetsController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: CreateAssetDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.assetsService.update(
-      id,
-      body as Record<string, unknown>,
-      this.toActor(user, request),
-    );
+    return this.assetsService.update(id, body, this.toActor(user, request));
   }
 
   @RequirePermissions('ASSETS_ATTACHMENTS_UPLOAD')
@@ -92,14 +91,14 @@ export class AssetsController {
   @UseInterceptors(FileInterceptor('file', attachmentMulterOptions))
   addAttachment(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: AddAssetAttachmentDto,
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.assetsService.addAttachment(
       id,
-      body as Record<string, unknown>,
+      body,
       file,
       this.toActor(user, request),
     );
@@ -109,43 +108,35 @@ export class AssetsController {
   @Post(':id/movements/transfer')
   move(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: MoveAssetDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.assetsService.move(
-      id,
-      body as Record<string, unknown>,
-      this.toActor(user, request),
-    );
+    return this.assetsService.move(id, body, this.toActor(user, request));
   }
 
   @RequirePermissions('ASSETS_ASSIGN')
   @Post(':id/movements/assign')
   assign(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: AssignAssetDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.assetsService.assign(
-      id,
-      body as Record<string, unknown>,
-      this.toActor(user, request),
-    );
+    return this.assetsService.assign(id, body, this.toActor(user, request));
   }
 
   @RequirePermissions('ASSETS_CHANGE_STATUS')
   @Post(':id/movements/status')
   changeStatus(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: ChangeAssetStatusDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.assetsService.changeStatus(
       id,
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
     );
   }

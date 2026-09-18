@@ -1,8 +1,22 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
+import { attachmentMulterOptions } from '../assets/attachment-storage';
+import { AddAssetAttachmentDto } from '../assets/dto/add-asset-attachment.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import type { AuthenticatedUser } from '../auth/types';
+import { RejectTransferRequestDto } from './dto/reject-transfer-request.dto';
 import { TransferRequestsService } from './transfer-requests.service';
 
 @Controller('transfer-requests')
@@ -41,11 +55,28 @@ export class TransferRequestsController {
   @Post(':id/reject')
   reject(
     @Param('id') id: string,
-    @Body() body: { notes?: string },
+    @Body() body: RejectTransferRequestDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.transferRequestsService.reject(id, body?.notes, {
+      userId: user.id,
+      username: user.username,
+      ipAddress: request.ip,
+    });
+  }
+
+  @RequirePermissions('ASSETS_ATTACHMENTS_UPLOAD')
+  @Post(':id/attachments')
+  @UseInterceptors(FileInterceptor('file', attachmentMulterOptions))
+  addAttachment(
+    @Param('id') id: string,
+    @Body() body: AddAssetAttachmentDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.transferRequestsService.addAttachment(id, body, file, {
       userId: user.id,
       username: user.username,
       ipAddress: request.ip,

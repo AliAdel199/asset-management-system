@@ -1,8 +1,22 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
+import { attachmentMulterOptions } from '../assets/attachment-storage';
+import { AddAssetAttachmentDto } from '../assets/dto/add-asset-attachment.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import type { AuthenticatedUser } from '../auth/types';
+import { RejectWriteOffRequestDto } from './dto/reject-write-off-request.dto';
 import { WriteOffRequestsService } from './write-off-requests.service';
 
 @Controller('write-off-requests')
@@ -41,7 +55,7 @@ export class WriteOffRequestsController {
   @Post(':id/reject')
   reject(
     @Param('id') id: string,
-    @Body() body: { notes?: string },
+    @Body() body: RejectWriteOffRequestDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
@@ -51,5 +65,22 @@ export class WriteOffRequestsController {
       { userId: user.id, username: user.username, ipAddress: request.ip },
       user.allowedOrganizationUnitIds,
     );
+  }
+
+  @RequirePermissions('ASSETS_ATTACHMENTS_UPLOAD')
+  @Post(':id/attachments')
+  @UseInterceptors(FileInterceptor('file', attachmentMulterOptions))
+  addAttachment(
+    @Param('id') id: string,
+    @Body() body: AddAssetAttachmentDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.writeOffRequestsService.addAttachment(id, body, file, {
+      userId: user.id,
+      username: user.username,
+      ipAddress: request.ip,
+    });
   }
 }

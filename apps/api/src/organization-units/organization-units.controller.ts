@@ -12,6 +12,8 @@ import type { Request } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import type { AuthenticatedUser } from '../auth/types';
+import { CreateOrganizationUnitDto } from './dto/create-organization-unit.dto';
+import { UpdateOrganizationUnitDto } from './dto/update-organization-unit.dto';
 import { OrganizationUnitsService } from './organization-units.service';
 
 @Controller('organization-units')
@@ -33,12 +35,12 @@ export class OrganizationUnitsController {
   @RequirePermissions('ORG_UNITS_MANAGE')
   @Post()
   create(
-    @Body() body: unknown,
+    @Body() body: CreateOrganizationUnitDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.organizationUnitsService.create(
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
     );
   }
@@ -47,13 +49,13 @@ export class OrganizationUnitsController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: UpdateOrganizationUnitDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.organizationUnitsService.update(
       id,
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
     );
   }

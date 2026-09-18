@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AssetCatalogModule } from './asset-catalog/asset-catalog.module';
@@ -14,6 +15,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
 import { OrganizationUnitsModule } from './organization-units/organization-units.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReferenceDataModule } from './reference-data/reference-data.module';
+import { ReportsModule } from './reports/reports.module';
 import { RolesModule } from './roles/roles.module';
 import { TransferRequestsModule } from './transfer-requests/transfer-requests.module';
 import { UsersModule } from './users/users.module';
@@ -21,6 +23,13 @@ import { WriteOffRequestsModule } from './write-off-requests/write-off-requests.
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([
+      {
+        // حماية أساسية من الطلبات المتكررة (تخمين كلمات المرور، إغراق الـ API)؛ يمكن تعديلها حسب الحاجة لكل مسار عبر @Throttle.
+        ttl: 60_000,
+        limit: 120,
+      },
+    ]),
     PrismaModule,
     AuthModule,
     AuditLogModule,
@@ -31,6 +40,7 @@ import { WriteOffRequestsModule } from './write-off-requests/write-off-requests.
     MaintenanceModule,
     OrganizationUnitsModule,
     ReferenceDataModule,
+    ReportsModule,
     RolesModule,
     TransferRequestsModule,
     UsersModule,
@@ -39,6 +49,7 @@ import { WriteOffRequestsModule } from './write-off-requests/write-off-requests.
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],

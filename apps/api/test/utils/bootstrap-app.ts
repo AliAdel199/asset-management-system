@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
@@ -9,8 +9,16 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
   }).compile();
 
   const app = moduleFixture.createNestApplication();
-  // يطابق app.setGlobalPrefix('api') المستخدم فعلياً بـ main.ts حتى تبقى المسارات مطابقة للتطبيق الحقيقي.
+  // يطابق app.setGlobalPrefix('api') وapp.useGlobalPipes(...) المستخدمين فعلياً بـ main.ts
+  // حتى يبقى سلوك التحقق من المدخلات في اختبارات e2e مطابقاً للتطبيق الحقيقي.
   app.setGlobalPrefix('api');
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
   await app.init();
 
   return app;

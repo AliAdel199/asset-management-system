@@ -3,6 +3,8 @@ import type { Request } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import type { AuthenticatedUser } from '../auth/types';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 
 @Controller('users')
@@ -28,12 +30,12 @@ export class UsersController {
   @RequirePermissions('USERS_MANAGE')
   @Post()
   create(
-    @Body() body: unknown,
+    @Body() body: CreateUserDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.usersService.create(
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
       user.allowedOrganizationUnitIds,
     );
@@ -43,13 +45,13 @@ export class UsersController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: UpdateUserDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.usersService.update(
       id,
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
       user.allowedOrganizationUnitIds,
     );

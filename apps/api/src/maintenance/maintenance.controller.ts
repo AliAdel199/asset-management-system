@@ -1,8 +1,23 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
+import { attachmentMulterOptions } from '../assets/attachment-storage';
+import { AddAssetAttachmentDto } from '../assets/dto/add-asset-attachment.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import type { AuthenticatedUser } from '../auth/types';
+import { CreateMaintenanceRequestDto } from './dto/create-maintenance-request.dto';
+import { UpdateMaintenanceStatusDto } from './dto/update-maintenance-status.dto';
 import { MaintenanceService } from './maintenance.service';
 
 @Controller('maintenance-requests')
@@ -32,12 +47,12 @@ export class MaintenanceController {
   @RequirePermissions('MAINTENANCE_CREATE')
   @Post()
   create(
-    @Body() body: unknown,
+    @Body() body: CreateMaintenanceRequestDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     // يستقبل طلب الصيانة من الواجهة ويترك التحقق والحفظ للخدمة.
-    return this.maintenanceService.create(body as Record<string, unknown>, {
+    return this.maintenanceService.create(body, {
       userId: user.id,
       username: user.username,
       ipAddress: request.ip,
@@ -48,15 +63,32 @@ export class MaintenanceController {
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: UpdateMaintenanceStatusDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     // يحدث حالة الطلب مع نتيجة الصيانة وتاريخ التنفيذ عند الإكمال.
-    return this.maintenanceService.updateStatus(
-      id,
-      body as Record<string, unknown>,
-      { userId: user.id, username: user.username, ipAddress: request.ip },
-    );
+    return this.maintenanceService.updateStatus(id, body, {
+      userId: user.id,
+      username: user.username,
+      ipAddress: request.ip,
+    });
+  }
+
+  @RequirePermissions('ASSETS_ATTACHMENTS_UPLOAD')
+  @Post(':id/attachments')
+  @UseInterceptors(FileInterceptor('file', attachmentMulterOptions))
+  addAttachment(
+    @Param('id') id: string,
+    @Body() body: AddAssetAttachmentDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.maintenanceService.addAttachment(id, body, file, {
+      userId: user.id,
+      username: user.username,
+      ipAddress: request.ip,
+    });
   }
 }

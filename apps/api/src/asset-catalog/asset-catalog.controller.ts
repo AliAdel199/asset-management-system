@@ -13,6 +13,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import type { AuthenticatedUser } from '../auth/types';
 import { AssetCatalogService } from './asset-catalog.service';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { CreateTypeDto } from './dto/create-type.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { UpdateTypeDto } from './dto/update-type.dto';
 
 @Controller('asset-catalog')
 @RequirePermissions('ASSET_CATALOG_MANAGE')
@@ -30,12 +34,12 @@ export class AssetCatalogController {
 
   @Post('categories')
   createCategory(
-    @Body() body: unknown,
+    @Body() body: CreateCategoryDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.assetCatalogService.createCategory(
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
     );
   }
@@ -43,13 +47,13 @@ export class AssetCatalogController {
   @Patch('categories/:id')
   updateCategory(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: UpdateCategoryDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.assetCatalogService.updateCategory(
       id,
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
     );
   }
@@ -69,13 +73,13 @@ export class AssetCatalogController {
   @Post('categories/:categoryId/types')
   createType(
     @Param('categoryId') categoryId: string,
-    @Body() body: unknown,
+    @Body() body: CreateTypeDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.assetCatalogService.createType(
       categoryId,
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
     );
   }
@@ -83,13 +87,13 @@ export class AssetCatalogController {
   @Patch('types/:id')
   updateType(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: UpdateTypeDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
     return this.assetCatalogService.updateType(
       id,
-      body as Record<string, unknown>,
+      body,
       this.toActor(user, request),
     );
   }

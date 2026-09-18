@@ -3,6 +3,8 @@ import type { Request } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import type { AuthenticatedUser } from '../auth/types';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 import { RolesService } from './roles.service';
 
 @Controller('roles')
@@ -28,28 +30,21 @@ export class RolesController {
   @RequirePermissions('ROLES_MANAGE')
   @Post()
   create(
-    @Body() body: unknown,
+    @Body() body: CreateRoleDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.rolesService.create(
-      body as Record<string, unknown>,
-      this.toActor(user, request),
-    );
+    return this.rolesService.create(body, this.toActor(user, request));
   }
 
   @RequirePermissions('ROLES_MANAGE')
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: UpdateRoleDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.rolesService.update(
-      id,
-      body as Record<string, unknown>,
-      this.toActor(user, request),
-    );
+    return this.rolesService.update(id, body, this.toActor(user, request));
   }
 }

@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import { join } from 'node:path';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 function resolveAllowedOrigins(): string[] {
@@ -20,6 +22,21 @@ function resolveAllowedOrigins(): string[] {
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.use(
+    helmet({
+      // API بدون HTML؛ CSP الافتراضي مخصص لصفحات ويب وليس له فائدة هنا وقد يعطّل أدوات مثل Swagger لاحقًا.
+      contentSecurityPolicy: false,
+      // المرفقات تُخدم من أصل مختلف عن واجهة الويب (منفذ مختلف)، فيجب السماح بتحميلها من أصل آخر.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
   app.enableCors({
     origin: resolveAllowedOrigins(),
   });
