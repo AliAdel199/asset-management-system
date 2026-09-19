@@ -147,4 +147,29 @@ describe('Write-off approval workflow (e2e)', () => {
 
     expect(assetAfterRejection.body.isDeleted).toBe(false);
   });
+
+  it('allows only one of two truly concurrent write-off requests for the same asset to succeed', async () => {
+    const asset = await createFixtureAsset(`E2E-WO-RACE-${Date.now()}`);
+    const officerToken = await loginAs(app, 'assets.officer');
+
+    // نفس فحص التصادم الحقيقي المستخدم بطلبات النقل، لهذا المسار (AssetsService.requestWriteOff).
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/api/assets/${asset.id}/deactivate`)
+        .set(authHeader(officerToken))
+        .send({ documentNumber: 'RACE-A', reason: 'اختبار تصادم' }),
+      request(app.getHttpServer())
+        .patch(`/api/assets/${asset.id}/deactivate`)
+        .set(authHeader(officerToken))
+        .send({ documentNumber: 'RACE-B', reason: 'اختبار تصادم' }),
+    ]);
+
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([200, 400]);
+
+    const pendingRequests = await prisma.assetWriteOffRequest.findMany({
+      where: { assetId: asset.id, status: 'PENDING' },
+    });
+    expect(pendingRequests).toHaveLength(1);
+  });
 });

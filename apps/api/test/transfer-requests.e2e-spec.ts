@@ -151,4 +151,31 @@ describe('Transfer request workflow (e2e)', () => {
 
     expect(assetAfterRejection.body.currentHolderOrganizationUnit).toBeNull();
   });
+
+  it('allows only one of two truly concurrent transfer requests for the same asset to succeed', async () => {
+    const asset = await createFixtureAsset(`E2E-TR-RACE-${Date.now()}`);
+    const officerToken = await loginAs(app, 'assets.officer');
+
+    // نطلق طلبين بنفس اللحظة تقريباً حتى نتأكد إن الحماية من التصادم (Serializable
+    // transaction بـ AssetsService.move) تمنع فعلاً إنشاء طلبين معلّقين لنفس الموجود،
+    // وليست فقط صحيحة نظرياً عند تنفيذها تباعاً.
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/api/assets/${asset.id}/movements/transfer`)
+        .set(authHeader(officerToken))
+        .send({ toOrganizationUnitId: br01UnitId, documentNumber: 'RACE-A' }),
+      request(app.getHttpServer())
+        .post(`/api/assets/${asset.id}/movements/transfer`)
+        .set(authHeader(officerToken))
+        .send({ toOrganizationUnitId: br01UnitId, documentNumber: 'RACE-B' }),
+    ]);
+
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([201, 400]);
+
+    const pendingRequests = await prisma.assetTransferRequest.findMany({
+      where: { assetId: asset.id, status: 'PENDING' },
+    });
+    expect(pendingRequests).toHaveLength(1);
+  });
 });

@@ -488,6 +488,7 @@ model AssetTransferRequest {
 
   @@index([assetId])
   @@index([status])
+  @@index([toOrganizationUnitId])
   @@map("asset_transfer_requests")
 }
 
@@ -512,5 +513,6 @@ model AssetWriteOffRequest {
 
   @@index([assetId])
   @@index([status])
+  @@index([organizationUnitId])
   @@map("asset_write_off_requests")
 }

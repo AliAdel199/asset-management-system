@@ -438,17 +438,12 @@ export class AssetsService {
       throw new BadRequestException('الجهة الجديدة مطلوبة لنقل الموجود.');
     }
 
-    const [asset, toOrganizationUnit, existingPendingRequest] =
-      await Promise.all([
-        this.prisma.asset.findUnique({ where: { id } }),
-        this.prisma.organizationUnit.findUnique({
-          where: { id: input.toOrganizationUnitId },
-        }),
-        this.prisma.assetTransferRequest.findFirst({
-          where: { assetId: id, status: 'PENDING' },
-          select: { id: true },
-        }),
-      ]);
+    const [asset, toOrganizationUnit] = await Promise.all([
+      this.prisma.asset.findUnique({ where: { id } }),
+      this.prisma.organizationUnit.findUnique({
+        where: { id: input.toOrganizationUnitId },
+      }),
+    ]);
 
     if (!asset) {
       throw new BadRequestException('الموجود المحدد غير موجود.');
@@ -462,24 +457,33 @@ export class AssetsService {
       throw new BadRequestException('الجهة الجديدة غير موجودة.');
     }
 
-    if (existingPendingRequest) {
-      throw new BadRequestException(
-        'يوجد طلب نقل بانتظار الموافقة لهذا الموجود بالفعل.',
-      );
-    }
+    const transferRequest = await this.runGuardedAgainstDuplicatePending(
+      async (tx) => {
+        const existingPendingRequest = await tx.assetTransferRequest.findFirst({
+          where: { assetId: id, status: 'PENDING' },
+          select: { id: true },
+        });
 
-    const transferRequest = await this.prisma.assetTransferRequest.create({
-      data: {
-        assetId: id,
-        fromOrganizationUnitId:
-          asset.currentHolderOrganizationUnitId ??
-          asset.owningOrganizationUnitId,
-        toOrganizationUnitId: toOrganizationUnit.id,
-        documentNumber: this.normalizeOptionalString(input.documentNumber),
-        notes: this.normalizeOptionalString(input.notes),
-        requestedByUserId: actor.userId ?? null,
+        if (existingPendingRequest) {
+          throw new BadRequestException(
+            'يوجد طلب نقل بانتظار الموافقة لهذا الموجود بالفعل.',
+          );
+        }
+
+        return tx.assetTransferRequest.create({
+          data: {
+            assetId: id,
+            fromOrganizationUnitId:
+              asset.currentHolderOrganizationUnitId ??
+              asset.owningOrganizationUnitId,
+            toOrganizationUnitId: toOrganizationUnit.id,
+            documentNumber: this.normalizeOptionalString(input.documentNumber),
+            notes: this.normalizeOptionalString(input.notes),
+            requestedByUserId: actor.userId ?? null,
+          },
+        });
       },
-    });
+    );
 
     await this.auditLogService.record({
       ...actor,
@@ -703,13 +707,7 @@ export class AssetsService {
       throw new BadRequestException('سبب الشطب مطلوب.');
     }
 
-    const [asset, existingPendingRequest] = await Promise.all([
-      this.prisma.asset.findUnique({ where: { id } }),
-      this.prisma.assetWriteOffRequest.findFirst({
-        where: { assetId: id, status: 'PENDING' },
-        select: { id: true },
-      }),
-    ]);
+    const asset = await this.prisma.asset.findUnique({ where: { id } });
 
     if (!asset || asset.isDeleted) {
       throw new BadRequestException(
@@ -717,23 +715,32 @@ export class AssetsService {
       );
     }
 
-    if (existingPendingRequest) {
-      throw new BadRequestException(
-        'يوجد طلب شطب بانتظار الموافقة لهذا الموجود بالفعل.',
-      );
-    }
+    const writeOffRequest = await this.runGuardedAgainstDuplicatePending(
+      async (tx) => {
+        const existingPendingRequest = await tx.assetWriteOffRequest.findFirst({
+          where: { assetId: id, status: 'PENDING' },
+          select: { id: true },
+        });
 
-    const writeOffRequest = await this.prisma.assetWriteOffRequest.create({
-      data: {
-        assetId: id,
-        organizationUnitId:
-          asset.currentHolderOrganizationUnitId ??
-          asset.owningOrganizationUnitId,
-        documentNumber,
-        reason,
-        requestedByUserId: actor.userId ?? null,
+        if (existingPendingRequest) {
+          throw new BadRequestException(
+            'يوجد طلب شطب بانتظار الموافقة لهذا الموجود بالفعل.',
+          );
+        }
+
+        return tx.assetWriteOffRequest.create({
+          data: {
+            assetId: id,
+            organizationUnitId:
+              asset.currentHolderOrganizationUnitId ??
+              asset.owningOrganizationUnitId,
+            documentNumber,
+            reason,
+            requestedByUserId: actor.userId ?? null,
+          },
+        });
       },
-    });
+    );
 
     await this.auditLogService.record({
       ...actor,
@@ -1078,6 +1085,51 @@ export class AssetsService {
         update: realEstateData,
       });
     }
+  }
+
+  /**
+   * يشغّل فحص "لا يوجد طلب معلّق بالفعل" وإنشاء الطلب الجديد بمعزل تسلسلي (Serializable)
+   * حتى لا يمر طلبان متزامنان لنفس الموجود كلاهما فحص "لا يوجد طلب معلّق" قبل أن يُنشئ
+   * أي منهما سجله. عند تعارض حقيقي يرفض Postgres أحد الطلبين فنعيد المحاولة.
+   */
+  private async runGuardedAgainstDuplicatePending<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(fn, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        if (!this.isSerializationFailure(error) || attempt === 2) {
+          throw error;
+        }
+      }
+    }
+
+    throw new BadRequestException('تعذر إكمال العملية، حاول مرة أخرى.');
+  }
+
+  private isSerializationFailure(error: unknown): boolean {
+    // كود Postgres للتعارض التسلسلي (40001) هو المؤشر الأوثق - رصدناه فعلياً هنا كـ
+    // DriverAdapterError { cause: { originalCode: '40001', kind: 'TransactionWriteConflict' } }
+    // مع Prisma 7 وadapter-pg، وهو شكل مختلف عن P2034 الموثّق تاريخياً لنفس الحالة عبر
+    // محرك Prisma القديم. نتحقق من الشكلين معاً حتى لا يفوتنا التعارض إذا تغيّر شكل الخطأ لاحقاً.
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+
+    const err = error as {
+      code?: unknown;
+      cause?: { kind?: unknown; originalCode?: unknown; code?: unknown };
+    };
+
+    return (
+      err.code === 'P2034' ||
+      err.cause?.kind === 'TransactionWriteConflict' ||
+      err.cause?.originalCode === '40001' ||
+      err.cause?.code === '40001'
+    );
   }
 
   private normalizeOptionalString(value: string | null | undefined) {

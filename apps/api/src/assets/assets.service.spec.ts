@@ -2,16 +2,19 @@ import { BadRequestException } from '@nestjs/common';
 import { AssetsService } from './assets.service';
 
 function createService() {
-  const prisma = {
+  const prisma: any = {
     asset: { findUnique: jest.fn() },
     organizationUnit: { findUnique: jest.fn() },
     assetTransferRequest: { findFirst: jest.fn(), create: jest.fn() },
     assetWriteOffRequest: { findFirst: jest.fn(), create: jest.fn() },
   };
+  // runGuardedAgainstDuplicatePending يشغّل الفحص والإنشاء عبر $transaction(fn, options)؛
+  // بما إن هذي الاختبارات لا تميز بين العميل الخارجي والداخلي، نمرر نفس كائن الموك كـ tx.
+  prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
 
   const auditLogService = { record: jest.fn() };
 
-  const service = new AssetsService(prisma as any, auditLogService as any);
+  const service = new AssetsService(prisma, auditLogService as any);
 
   return { service, prisma, auditLogService };
 }
