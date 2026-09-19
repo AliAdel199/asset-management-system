@@ -135,6 +135,8 @@ const sectionNames: Record<string, string> = {
   VEH: "قسم السيارات",
   LND: "قسم الأراضي",
   BLD: "قسم العقار",
+  MED: "قسم الأجهزة الطبية",
+  ELEC: "قسم الأجهزة الكهربائية",
 };
 
 function getAssetSectionDetails(asset: Asset) {
@@ -771,7 +773,10 @@ export function AssetsWorkspace({
           <span>هذه الحقول إدخال مباشر، وليست قوائم اختيار.</span>
         </div>
 
-        {(selectedCategory?.code === "DEV" || selectedCategory?.code === "FUR") && (
+        {selectedCategory &&
+          selectedCategory.code !== "VEH" &&
+          selectedCategory.code !== "LND" &&
+          selectedCategory.code !== "BLD" && (
           <>
             <label>
               اسم الموجود

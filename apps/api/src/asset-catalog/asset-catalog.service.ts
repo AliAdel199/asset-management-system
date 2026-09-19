@@ -1,7 +1,10 @@
+import { randomBytes } from 'node:crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import type { AuditActor } from '../audit-log/types';
 import { PrismaService } from '../prisma/prisma.service';
+
+const CATEGORY_CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 type CreateCategoryInput = {
   name?: string;
@@ -45,19 +48,49 @@ export class AssetCatalogService {
 
   async createCategory(input: CreateCategoryInput, actor: AuditActor) {
     const name = this.normalizeRequiredString(input.name, 'اسم الصنف مطلوب.');
-    const code = this.normalizeRequiredString(
-      input.code,
-      'رمز الصنف مطلوب.',
-    ).toUpperCase();
+    const providedCode = input.code?.trim();
 
-    const existingCategory = await this.prisma.assetCategory.findUnique({
-      where: { code },
-    });
+    if (providedCode) {
+      const code = providedCode.toUpperCase();
+      const existingCategory = await this.prisma.assetCategory.findUnique({
+        where: { code },
+      });
 
-    if (existingCategory) {
-      throw new BadRequestException('رمز الصنف مستخدم بالفعل.');
+      if (existingCategory) {
+        throw new BadRequestException('رمز الصنف مستخدم بالفعل.');
+      }
+
+      return this.saveNewCategory(code, name, input, actor);
     }
 
+    // بدون رمز مُدخل: نولّد رمزاً فريداً تلقائياً بدل إجبار المستخدم على اختراع واحد،
+    // ونعيد المحاولة برمز جديد عند تصادم نادر (P2002) بدل فشل الطلب.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const code = this.generateRandomCategoryCode(attempt < 3 ? 3 : 4);
+
+      try {
+        return await this.saveNewCategory(code, name, input, actor);
+      } catch (error) {
+        const isDuplicateCode =
+          typeof error === 'object' &&
+          error !== null &&
+          (error as { code?: unknown }).code === 'P2002';
+
+        if (!isDuplicateCode || attempt === 4) {
+          throw error;
+        }
+      }
+    }
+
+    throw new BadRequestException('تعذر توليد رمز صنف فريد، حاول مرة أخرى.');
+  }
+
+  private async saveNewCategory(
+    code: string,
+    name: string,
+    input: CreateCategoryInput,
+    actor: AuditActor,
+  ) {
     const createdCategory = await this.prisma.assetCategory.create({
       data: {
         name,
@@ -76,6 +109,17 @@ export class AssetCatalogService {
     });
 
     return createdCategory;
+  }
+
+  private generateRandomCategoryCode(length: number): string {
+    const bytes = randomBytes(length);
+    let code = '';
+
+    for (let i = 0; i < length; i += 1) {
+      code += CATEGORY_CODE_ALPHABET[bytes[i] % CATEGORY_CODE_ALPHABET.length];
+    }
+
+    return code;
   }
 
   async updateCategory(

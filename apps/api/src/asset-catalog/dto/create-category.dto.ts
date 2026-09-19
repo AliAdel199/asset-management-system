@@ -5,9 +5,11 @@ export class CreateCategoryDto {
   @MinLength(1)
   name!: string;
 
+  // اختياري: إن تُرك فارغاً يولّد النظام رمزاً فريداً تلقائياً.
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  code!: string;
+  code?: string;
 
   @IsOptional()
   @IsString()

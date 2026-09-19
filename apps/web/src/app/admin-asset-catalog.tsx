@@ -23,7 +23,6 @@ type AssetCategory = {
 
 type CategoryFormState = {
   name: string;
-  code: string;
   description: string;
   isActive: boolean;
 };
@@ -36,7 +35,7 @@ type TypeFormState = {
 };
 
 function emptyCategoryForm(): CategoryFormState {
-  return { name: "", code: "", description: "", isActive: true };
+  return { name: "", description: "", isActive: true };
 }
 
 function emptyTypeForm(categoryId: string): TypeFormState {
@@ -89,7 +88,6 @@ export function AdminAssetCatalogPanel() {
     setCategoryEditingId(category.id);
     setCategoryForm({
       name: category.name,
-      code: category.code,
       description: category.description ?? "",
       isActive: category.isActive,
     });
@@ -263,6 +261,9 @@ export function AdminAssetCatalogPanel() {
         <div>
           <p className={styles.eyebrow}>أصناف الموجودات</p>
           <h3>{categoryEditingId ? "تعديل صنف" : "إضافة صنف جديد"}</h3>
+          {!categoryEditingId && (
+            <p>يولّد النظام رمز الصنف تلقائياً بدون تكرار.</p>
+          )}
         </div>
       </div>
 
@@ -281,22 +282,6 @@ export function AdminAssetCatalogPanel() {
             required
             type="text"
             value={categoryForm.name}
-          />
-        </label>
-
-        <label>
-          رمز الصنف
-          <input
-            disabled={Boolean(categoryEditingId)}
-            onChange={(event) =>
-              setCategoryForm((current) => ({
-                ...current,
-                code: event.target.value,
-              }))
-            }
-            required
-            type="text"
-            value={categoryForm.code}
           />
         </label>
 

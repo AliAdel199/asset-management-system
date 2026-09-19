@@ -63,6 +63,38 @@ describe('AssetCatalogService.createCategory', () => {
       expect.objectContaining({ action: 'ASSET_CATEGORY_CREATE' }),
     );
   });
+
+  it('auto-generates a unique code when none is provided', async () => {
+    const { service, prisma } = createService();
+    prisma.assetCategory.create.mockResolvedValue({
+      id: 'cat-1',
+      name: 'أجهزة طبية',
+      code: 'ABC',
+    });
+
+    await service.createCategory({ name: 'أجهزة طبية' }, actor);
+
+    // لا نتحقق من عدم استدعاء findUnique هنا لأن المسار التلقائي لا يفحص
+    // مسبقاً، بل يعتمد على قيد قاعدة البيانات نفسه عبر إعادة المحاولة.
+    const createCall = prisma.assetCategory.create.mock.calls[0][0];
+    expect(createCall.data.name).toBe('أجهزة طبية');
+    expect(createCall.data.code).toMatch(/^[A-Z]{3}$/);
+  });
+
+  it('retries with a new generated code when the first one collides', async () => {
+    const { service, prisma } = createService();
+    const duplicateError = Object.assign(new Error('duplicate'), {
+      code: 'P2002',
+    });
+    prisma.assetCategory.create
+      .mockRejectedValueOnce(duplicateError)
+      .mockResolvedValueOnce({ id: 'cat-1', name: 'أجهزة طبية', code: 'XYZ' });
+
+    const result = await service.createCategory({ name: 'أجهزة طبية' }, actor);
+
+    expect(prisma.assetCategory.create).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ id: 'cat-1', name: 'أجهزة طبية', code: 'XYZ' });
+  });
 });
 
 describe('AssetCatalogService.removeCategory', () => {

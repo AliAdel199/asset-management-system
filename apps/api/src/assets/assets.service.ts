@@ -827,7 +827,13 @@ export class AssetsService {
     input: CreateAssetInput,
   ) {
     // كل قسم له جدول تفاصيل مستقل حتى نضيف حقوله مستقبلاً بدون تضخيم جدول assets.
-    if (categoryCode === 'DEV' || categoryCode === 'FUR') {
+    // أي تصنيف ليس له نموذج تفاصيل خاص (سيارات/أراضٍ/مبانٍ) يُعامل كتصنيف عام،
+    // بما في ذلك أي تصنيف جديد يضيفه المستخدم لاحقاً من لوحة الإدارة.
+    if (
+      categoryCode !== 'VEH' &&
+      categoryCode !== 'LND' &&
+      categoryCode !== 'BLD'
+    ) {
       await tx.generalAssetDetail.create({
         data: {
           assetId,
@@ -938,7 +944,11 @@ export class AssetsService {
     input: CreateAssetInput,
   ) {
     // عند تغيير القسم نحذف تفاصيل الأقسام الأخرى حتى لا تبقى معلومات قديمة مرتبطة بالموجود.
-    if (categoryCode !== 'DEV' && categoryCode !== 'FUR') {
+    if (
+      categoryCode === 'VEH' ||
+      categoryCode === 'LND' ||
+      categoryCode === 'BLD'
+    ) {
       await tx.generalAssetDetail.deleteMany({ where: { assetId } });
     }
 
@@ -954,7 +964,11 @@ export class AssetsService {
       await tx.realEstateAssetDetail.deleteMany({ where: { assetId } });
     }
 
-    if (categoryCode === 'DEV' || categoryCode === 'FUR') {
+    if (
+      categoryCode !== 'VEH' &&
+      categoryCode !== 'LND' &&
+      categoryCode !== 'BLD'
+    ) {
       await tx.generalAssetDetail.upsert({
         where: { assetId },
         create: {
