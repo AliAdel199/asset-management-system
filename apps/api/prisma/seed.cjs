@@ -267,8 +267,17 @@ const rolePermissionsByRoleName = {
   ],
 };
 
-// كلمة مرور تجريبية موحدة لكل مستخدمي البذر - يجب تغييرها فوراً قبل أي استخدام فعلي.
-const seedUserPassword = 'Passw0rd!2026';
+// كلمة مرور تجريبية موحدة لكل مستخدمي البذر. يجب تجاوزها عبر SEED_USER_PASSWORD
+// بأي بيئة تشغيل تجريبي أو رسمي - القيمة الافتراضية معروفة علناً بمستودع الكود.
+const DEFAULT_SEED_USER_PASSWORD = 'Passw0rd!2026';
+const seedUserPassword =
+  process.env.SEED_USER_PASSWORD || DEFAULT_SEED_USER_PASSWORD;
+const isUsingDefaultSeedPassword =
+  seedUserPassword === DEFAULT_SEED_USER_PASSWORD;
+
+// بيانات الموجودات وطلبات الصيانة التجريبية (seedDemoData) مخصصة للتطوير المحلي فقط.
+// تبقى معطّلة افتراضياً؛ فعّلها بتمرير SEED_DEMO_DATA=true للتطوير المحلي فقط.
+const shouldSeedDemoData = process.env.SEED_DEMO_DATA === 'true';
 
 const users = [
   {
@@ -857,7 +866,24 @@ async function main() {
     });
   }
 
-  await seedDemoData();
+  if (shouldSeedDemoData) {
+    console.warn(
+      'SEED_DEMO_DATA=true: سيتم إدخال موجودات وطلبات صيانة تجريبية وهمية. لا تستخدم هذا الخيار على بيئة تجريبية أو رسمية.',
+    );
+    await seedDemoData();
+  } else {
+    console.log(
+      'تخطي البيانات التجريبية (الموجودات الوهمية). لتفعيلها بالتطوير المحلي فقط: SEED_DEMO_DATA=true.',
+    );
+  }
+
+  if (isUsingDefaultSeedPassword) {
+    console.warn(
+      'تحذير: مستخدمو البذر يستخدمون كلمة المرور الافتراضية المعروفة علناً بالمستودع. ' +
+        'بأي بيئة تجريبية أو رسمية، مرر SEED_USER_PASSWORD بقيمة عشوائية طويلة، ' +
+        'أو غيّر كلمات المرور فوراً من داخل النظام بعد أول تسجيل دخول.',
+    );
+  }
 }
 
 main()
