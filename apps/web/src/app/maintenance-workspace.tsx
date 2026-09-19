@@ -346,13 +346,19 @@ export function MaintenanceWorkspace({
     }
   }
 
-  async function handleReject(id: string) {
+  async function handleReject(event: FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
     setIsSubmitting(true);
     setMessage("");
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
 
     try {
       const response = await apiFetch(`/maintenance-requests/${id}/reject`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: formData.get("notes") }),
       });
 
       if (!response.ok) {
@@ -363,6 +369,7 @@ export function MaintenanceWorkspace({
       await refreshRequests();
       setMessage("تم رفض طلب الصيانة.");
       setMessageTone("success");
+      form.reset();
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "تعذر رفض طلب الصيانة.",
@@ -578,7 +585,7 @@ export function MaintenanceWorkspace({
                     <td>{displayValue(request.cost)}</td>
                     <td>{request.description}</td>
                     <td>
-                      <div style={{ display: "flex", gap: 8 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <button
                           className={styles.tableActionButton}
                           onClick={() =>
@@ -590,7 +597,10 @@ export function MaintenanceWorkspace({
                         </button>
                         {request.status === "PENDING" &&
                           hasPermission("MAINTENANCE_APPROVE") && (
-                            <>
+                            <form
+                              onSubmit={(event) => handleReject(event, request.id)}
+                              style={{ display: "flex", gap: 8, alignItems: "center" }}
+                            >
                               <button
                                 className={styles.tableActionButton}
                                 disabled={isSubmitting}
@@ -599,15 +609,26 @@ export function MaintenanceWorkspace({
                               >
                                 اعتماد
                               </button>
+                              <input
+                                name="notes"
+                                placeholder="سبب الرفض (اختياري)"
+                                style={{
+                                  minWidth: 140,
+                                  border: "1px solid var(--border-strong)",
+                                  borderRadius: "var(--radius-sm)",
+                                  padding: "8px 10px",
+                                  font: "inherit",
+                                }}
+                                type="text"
+                              />
                               <button
                                 className={styles.tableActionButton}
                                 disabled={isSubmitting}
-                                onClick={() => handleReject(request.id)}
-                                type="button"
+                                type="submit"
                               >
                                 رفض
                               </button>
-                            </>
+                            </form>
                           )}
                       </div>
                     </td>

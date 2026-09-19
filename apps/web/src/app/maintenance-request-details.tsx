@@ -127,6 +127,7 @@ export function MaintenanceRequestDetailsView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [materials, setMaterials] = useState<MaterialRow[]>([emptyMaterial()]);
   const [assetStatuses, setAssetStatuses] = useState<AssetStatus[]>([]);
+  const [rejectionNotes, setRejectionNotes] = useState("");
 
   const loadRequest = useCallback(() => {
     return apiFetch(`/maintenance-requests/${requestId}`)
@@ -307,7 +308,13 @@ export function MaintenanceRequestDetailsView({
     try {
       const response = await apiFetch(
         `/maintenance-requests/${requestId}/${decision}`,
-        { method: "POST" },
+        decision === "reject"
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ notes: rejectionNotes }),
+            }
+          : { method: "POST" },
       );
 
       if (!response.ok) {
@@ -327,6 +334,7 @@ export function MaintenanceRequestDetailsView({
           : "تم رفض طلب الصيانة.",
       );
       setTone("success");
+      setRejectionNotes("");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -462,22 +470,33 @@ export function MaintenanceRequestDetailsView({
           </div>
 
           {hasPermission("MAINTENANCE_APPROVE") ? (
-            <div className={styles.formActions}>
-              <button
-                disabled={isSubmitting}
-                onClick={() => decideRequest("approve")}
-                type="button"
-              >
-                {isSubmitting ? "جاري التنفيذ" : "اعتماد الطلب"}
-              </button>
-              <button
-                disabled={isSubmitting}
-                onClick={() => decideRequest("reject")}
-                type="button"
-              >
-                رفض الطلب
-              </button>
-            </div>
+            <>
+              <label className={styles.fullWidth}>
+                سبب الرفض (اختياري، يُستخدم عند الرفض فقط)
+                <textarea
+                  onChange={(event) => setRejectionNotes(event.target.value)}
+                  placeholder="اكتب سبب الرفض إن وجد"
+                  rows={2}
+                  value={rejectionNotes}
+                />
+              </label>
+              <div className={styles.formActions}>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() => decideRequest("approve")}
+                  type="button"
+                >
+                  {isSubmitting ? "جاري التنفيذ" : "اعتماد الطلب"}
+                </button>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() => decideRequest("reject")}
+                  type="button"
+                >
+                  رفض الطلب
+                </button>
+              </div>
+            </>
           ) : (
             <p className={styles.formHint}>
               هذا الطلب بانتظار موافقة مسؤول مخوّل قبل أن ينتقل الموجود إلى قيد
