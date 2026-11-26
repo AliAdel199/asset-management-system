@@ -91,6 +91,17 @@ export class MaintenanceService {
     });
   }
 
+  countPending(allowedOrganizationUnitIds: string[] | null) {
+    return this.prisma.maintenanceRequest.count({
+      where: {
+        status: 'PENDING',
+        asset: allowedOrganizationUnitIds
+          ? { owningOrganizationUnitId: { in: allowedOrganizationUnitIds } }
+          : undefined,
+      },
+    });
+  }
+
   async getAlerts(allowedOrganizationUnitIds: string[] | null) {
     // تنبيهات الصيانة الدورية: نحسبها من تاريخ آخر صيانة مكتملة (أو دخول الخدمة إن لم توجد) + دورية الموجود.
     const dueSoonThresholdDays = 30;
