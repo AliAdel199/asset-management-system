@@ -92,11 +92,36 @@
   height: 100%;
 }
 
+.navLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 8px;
+}
+
+.navBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .main {
   display: grid;
   align-content: start;
   gap: 20px;
   min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+
 }
 
 .header {
@@ -831,6 +856,11 @@
 .assetsTableWrap {
   overflow-x: auto;
 }
+/* جداول التقارير قليلة الأعمدة، فلا نفرض عليها 760px مثل جدول الموجودات.
+   إذا احتاج جدول عرضًا أكبر، يتمرر أفقيًا داخل .reportTableWrap */
+.reportTableWrap .assetsTable {
+  min-width: 0;
+}
 
 .reportTableWrap {
   overflow-x: auto;
@@ -838,8 +868,9 @@
 
 .reportControls {
   display: grid;
-  grid-template-columns: 1.4fr 0.8fr auto;
-  gap: 12px;
+  /* عدد الأعمدة يتحدد تلقائيًا: كل خانة 180px على الأقل，
+     فتصير 4 أعمدة على الحاسبة، وعمود واحد على الهاتف， بدون media query */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));  gap: 12px;
   align-items: end;
 }
 
@@ -850,7 +881,8 @@
   font-size: 14px;
 }
 
-.reportControls select {
+.reportControls select,
+.reportControls input:not([type="checkbox"]) {
   width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -1161,17 +1193,16 @@
   .domainModules,
   .actionTabs,
   .assetFilters,
-  .reportControls,
   .actionGrid,
   .maintenanceSummary,
   .assetForm,
   .collapsibleContent,
   .moduleRoadmap {
-    grid-template-columns: 1fr;
-  }
+    grid-template-columns: minmax(0, 1fr);
+    }
 
   .materialRow {
-    grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1225,6 +1256,43 @@
 
   .header h2 {
     font-size: 22px;
+  }
+    .page {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  /* الصناديق المتداخلة كل واحد يضيف هامشه؛ نقللها حتى يبقى مكان للمحتوى */
+  .header,
+  .assetsWorkspace {
+    padding: 16px;
+  }
+
+  .assetsWorkspace .assetsWorkspace {
+    padding: 12px;
+  }
+
+  .detailGrid article {
+    padding: 14px;
+  }
+
+  /* بطاقات الإجماليات: عمودين بدل بطاقة كبيرة بكل سطر */
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .metrics article {
+    padding: 14px;
+  }
+
+  .metrics strong {
+    font-size: 22px;
+  }
+
+  .assetsTable th,
+  .assetsTable td {
+    padding: 8px;
   }
 }
 
@@ -1332,4 +1400,43 @@
 .sidebarUser button:hover {
   background: #ffffff;
   color: var(--sidebar-from);
+}
+
+  .main > *,
+  .assetsWorkspace > *,
+  .detailGrid > * {
+    min-width: 0;
+  }
+  /* تبويبات مركز التقارير: صف واحد يتمرر أفقيًا على الشاشات الضيقة */
+.reportTabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none; /* إخفاء شريط التمرير (Firefox) */
+}
+
+.reportTabs::-webkit-scrollbar {
+  display: none; /* إخفاء شريط التمرير (Chrome/Edge) */
+}
+
+.reportTabs button {
+  flex: 0 0 auto; /* لا يتقلص الزر، فيبقى النص كاملًا */
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap; /* النص لا ينكسر لسطرين */
+  cursor: pointer;
+}
+
+/* التبويب المختار: الصفحة تضبط aria-pressed="true" عليه أصلًا */
+.reportTabs button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  background: var(--accent);
 }

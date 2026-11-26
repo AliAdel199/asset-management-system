@@ -8,5 +8,6 @@ import { TransferRequestsService } from './transfer-requests.service';
   imports: [PrismaModule, AuditLogModule],
   controllers: [TransferRequestsController],
   providers: [TransferRequestsService],
+  exports: [TransferRequestsService],
 })
 export class TransferRequestsModule {}

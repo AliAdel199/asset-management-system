@@ -47,6 +47,17 @@ export class WriteOffRequestsService {
     });
   }
 
+  countPending(allowedOrganizationUnitIds: string[] | null) {
+    return this.prisma.assetWriteOffRequest.count({
+      where: {
+        status: 'PENDING',
+        organizationUnitId: allowedOrganizationUnitIds
+          ? { in: allowedOrganizationUnitIds }
+          : undefined,
+      },
+    });
+  }
+
   async approve(
     id: string,
     actor: AuditActor,

@@ -49,6 +49,17 @@ export class TransferRequestsService {
     });
   }
 
+  countPending(allowedOrganizationUnitIds: string[] | null) {
+    return this.prisma.assetTransferRequest.count({
+      where: {
+        status: 'PENDING',
+        toOrganizationUnitId: allowedOrganizationUnitIds
+          ? { in: allowedOrganizationUnitIds }
+          : undefined,
+      },
+    });
+  }
+
   async approve(id: string, actor: AuditActor) {
     const request = await this.prisma.assetTransferRequest.findUnique({
       where: { id },

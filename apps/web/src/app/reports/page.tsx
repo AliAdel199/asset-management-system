@@ -26,7 +26,7 @@ export default function ReportsPage() {
       subtitle="التقارير"
       title="مركز التقارير حسب الجهة والتصنيف والحالة والصيانة"
     >
-      <div className={styles.reportControls} aria-label="أقسام التقارير">
+        <div className={styles.reportTabs} aria-label="أقسام التقارير">
         {TABS.map((tab) => (
           <button
             aria-pressed={activeTab === tab.id}

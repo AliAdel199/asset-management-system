@@ -8,5 +8,6 @@ import { WriteOffRequestsService } from './write-off-requests.service';
   imports: [PrismaModule, AuditLogModule],
   controllers: [WriteOffRequestsController],
   providers: [WriteOffRequestsService],
+  exports: [WriteOffRequestsService],
 })
 export class WriteOffRequestsModule {}

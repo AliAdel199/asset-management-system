@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useAuth } from "./auth-context";
 import { navIcons } from "./nav-icons";
 import styles from "./page.module.css";
+import { usePendingApprovals } from "./use-pending-approvals";
 
 type AppShellProps = {
   active:
@@ -32,18 +33,25 @@ const navItems = [
   { key: "vehicles", href: "/vehicles", label: "السيارات" },
   { key: "lands", href: "/lands", label: "الأراضي" },
   { key: "properties", href: "/properties", label: "العقار" },
-  { key: "maintenance", href: "/maintenance", label: "الصيانة" },
+  {
+    key: "maintenance",
+    href: "/maintenance",
+    label: "الصيانة",
+    countKey: "maintenanceRequests",
+  },
   {
     key: "transfer-requests",
     href: "/transfer-requests",
     label: "اعتماد النقل",
     permission: "ASSETS_TRANSFER_APPROVE",
+    countKey: "transferRequests",
   },
   {
     key: "write-off-requests",
     href: "/write-off-requests",
     label: "اعتماد الشطب",
     permission: "ASSETS_WRITEOFF_APPROVE",
+    countKey: "writeOffRequests",
   },
   { key: "reports", href: "/reports", label: "التقارير" },
   {
@@ -74,6 +82,7 @@ export function AppShell({
 }: AppShellProps) {
   const router = useRouter();
   const { hasPermission, logout, status, user } = useAuth();
+  const pendingApprovals = usePendingApprovals(status === "authenticated");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -107,18 +116,28 @@ export function AppShell({
 
               return !("permission" in item) || hasPermission(item.permission);
             })
-            .map((item) => (
-              <Link
-                className={item.key === active ? styles.activeNav : ""}
-                href={item.href}
-                key={item.key}
-              >
-                <span className={styles.navIcon} aria-hidden="true">
-                  {navIcons[item.key]}
-                </span>
-                {item.label}
-              </Link>
-            ))}
+            .map((item) => {
+              const pendingCount =
+                "countKey" in item ? pendingApprovals[item.countKey] : 0;
+
+              return (
+                <Link
+                  className={item.key === active ? styles.activeNav : ""}
+                  href={item.href}
+                  key={item.key}
+                >
+                  <span className={styles.navIcon} aria-hidden="true">
+                    {navIcons[item.key]}
+                  </span>
+                  <span className={styles.navLabel}>
+                    {item.label}
+                    {pendingCount > 0 && (
+                      <span className={styles.navBadge}>{pendingCount}</span>
+                    )}
+                  </span>
+                </Link>
+              );
+            })}
         </nav>
         {user && (
           <div className={styles.sidebarUser}>

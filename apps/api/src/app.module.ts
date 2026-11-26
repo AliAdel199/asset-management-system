@@ -12,6 +12,7 @@ import { PermissionsGuard } from './auth/permissions.guard';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationUnitsModule } from './organization-units/organization-units.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReferenceDataModule } from './reference-data/reference-data.module';
@@ -38,6 +39,7 @@ import { WriteOffRequestsModule } from './write-off-requests/write-off-requests.
     DashboardModule,
     InventoryModule,
     MaintenanceModule,
+    NotificationsModule,
     OrganizationUnitsModule,
     ReferenceDataModule,
     ReportsModule,
